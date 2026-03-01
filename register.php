@@ -1,21 +1,50 @@
 <?php
+
+require_once __DIR__ . '/config/database.php';
+require_once __DIR__ . '/models/User.php';
+
+$database = new Database();
+$pdo = $database->getConnection();
+
+$userModel = new User($pdo);
+
 $message = '';
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $message = 'Это тестовая версия страницы. База данных пока не подключена.';
+
+    $name = trim($_POST['name'] ?? '');
+    $email    = trim($_POST['email'] ?? '');
+    $password = $_POST['password'] ?? '';
+    $confirm  = $_POST['confirm'] ?? '';
+
+    if (empty($name) || empty($email) || empty($password) || empty($confirm)) {
+        $error = 'Заполните все поля!';
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error = 'Некорректный email!';
+    } elseif (mb_strlen($password) < 6) {
+        $error = 'Пароль должен быть не менее 6 символов!';
+    } elseif ($password !== $confirm) {
+        $error = 'Пароли не совпадают!';
+    } elseif ($userModel->emailExists($email)) {
+        $error = 'Пользователь с таким email уже зарегистрирован!';
+    } else {
+
+        if ($userModel->register($name, $email, $password)) {
+            $message = 'Регистрация успешна! Теперь вы можете войти.';
+        } else {
+            $error = 'Ошибка при регистрации.';
+        }
+    }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <title>Регистрация</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
-          rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 
 <body class="bg-light">
@@ -27,11 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="card shadow-lg border-0">
                 <div class="card-body p-5">
 
-                    <div class="text-center mb-4">
-                        <span class="badge bg-primary rounded-circle p-3" style="font-size:2rem">👤</span>
-                        <h3 class="mt-3">Создайте аккаунт</h3>
-                        <p class="text-muted">Демонстрационная форма</p>
-                    </div>
+                    <h3 class="text-center mb-4">Создайте аккаунт</h3>
 
                     <?php if ($message): ?>
                         <div class="alert alert-success">
@@ -39,65 +64,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
                     <?php endif; ?>
 
+                    <?php if ($error): ?>
+                        <div class="alert alert-danger">
+                            <?= htmlspecialchars($error) ?>
+                        </div>
+                    <?php endif; ?>
+
                     <form method="POST">
 
-                        <div class="form-floating mb-3">
+                        <div class="mb-3">
+                            <label class="form-label">Имя пользователя</label>
                             <input type="text"
+                                   name="name"
                                    class="form-control"
-                                   id="username"
-                                   name="username"
-                                   placeholder="Имя"
-                                   required>
-                            <label for="username">👤 Имя пользователя</label>
+                                   required
+                                   value="<?= htmlspecialchars($_POST['name'] ?? '') ?>">
                         </div>
 
-                        <div class="form-floating mb-3">
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
                             <input type="email"
-                                   class="form-control"
-                                   id="email"
                                    name="email"
-                                   placeholder="Email"
-                                   required>
-                            <label for="email">📧 Email адрес</label>
+                                   class="form-control"
+                                   required
+                                   value="<?= htmlspecialchars($_POST['email'] ?? '') ?>">
                         </div>
 
-                        <div class="form-floating mb-3">
+                        <div class="mb-3">
+                            <label class="form-label">Пароль</label>
                             <input type="password"
-                                   class="form-control"
-                                   id="password"
                                    name="password"
-                                   placeholder="Пароль"
-                                   required>
-                            <label for="password">🔒 Пароль</label>
-                        </div>
-
-                        <div class="form-floating mb-4">
-                            <input type="password"
                                    class="form-control"
-                                   id="confirm"
-                                   name="confirm"
-                                   placeholder="Повтор"
-                                   required>
-                            <label for="confirm">🔒 Повторите пароль</label>
+                                   required minlength="6">
                         </div>
 
-                        <button type="submit"
-                                class="btn btn-primary btn-lg w-100">
+                        <div class="mb-4">
+                            <label class="form-label">Повторите пароль</label>
+                            <input type="password"
+                                   name="confirm"
+                                   class="form-control"
+                                   required minlength="6">
+                        </div>
+
+                        <button class="btn btn-primary w-100">
                             Зарегистрироваться
                         </button>
 
                     </form>
 
-                    <div class="d-flex align-items-center my-4">
-                        <hr class="flex-grow-1">
-                        <span class="mx-2 text-muted">или</span>
-                        <hr class="flex-grow-1">
-                    </div>
-
-                    <a href="#"
-                       class="btn btn-outline-secondary w-100">
-                        Войти в существующий аккаунт
-                    </a>
+                    <p class="text-center mt-3">
+                        Уже есть аккаунт? <a href="login.php">Войти</a>
+                    </p>
 
                 </div>
             </div>

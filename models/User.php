@@ -6,27 +6,24 @@ class User {
         $this->pdo = $pdo;
     }
 
-    // Регистрация нового пользователя
-    public function register($username, $email, $password) {
-        // Хешируем пароль (НИКОГДА не сохраняем в открытом виде!)
-        $hash = password_hash($password, PASSWORD_DEFAULT);
-
-        $sql = "INSERT INTO users (username, email, password) VALUES (?, ?, ?)";
-        $stmt = $this->pdo->prepare($sql);
-        return $stmt->execute([$username, $email, $hash]);
-    }
-
-    // Поиск пользователя по email (для входа — ПР45)
+    // Поиск пользователя по email
     public function findByEmail($email) {
-        $sql = "SELECT * FROM users WHERE email = ?";
-        $stmt = $this->pdo->prepare($sql);
+        $stmt = $this->pdo->prepare("SELECT * FROM users WHERE email = ?");
         $stmt->execute([$email]);
-        return $stmt->fetch();
+        return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
-    // Проверка: существует ли email (для валидации)
+    // Проверка существования email
     public function emailExists($email) {
-        $user = $this->findByEmail($email);
-        return $user !== false;
+        $stmt = $this->pdo->prepare("SELECT id FROM users WHERE email = ?");
+        $stmt->execute([$email]);
+        return $stmt->fetch() !== false;
+    }
+
+    // Регистрация нового пользователя
+    public function register($name, $email, $password) {
+        $hash = password_hash($password, PASSWORD_DEFAULT);
+        $stmt = $this->pdo->prepare("INSERT INTO users (name, email, password) VALUES (?, ?, ?)");
+        return $stmt->execute([$name, $email, $hash]);
     }
 }
