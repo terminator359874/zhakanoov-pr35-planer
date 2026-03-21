@@ -11,14 +11,22 @@ $database = new Database();
 $db = $database->getConnection();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $name = $_POST['name'] ?? '';
-    $description = $_POST['description'] ?? '';
+    $name = trim($_POST['name'] ?? '');
+    $description = trim($_POST['description'] ?? '');
     $visibility = $_POST['visibility'] ?? 'private';
     $owner_id = $_SESSION['user_id'];
 
-    // Простая валидация
-    if (empty($name) || strlen($name) > 200) {
+    // 0️⃣ Проверяем текущее количество проектов у пользователя
+    $stmtCount = $db->prepare("SELECT COUNT(*) FROM projects WHERE owner_id = :owner_id");
+    $stmtCount->execute(['owner_id' => $owner_id]);
+    $projectCount = $stmtCount->fetchColumn();
+
+    // Простая валидация + Проверка лимита
+    if (empty($name) || mb_strlen($name) > 200) {
         $error = "Название проекта обязательно и не должно превышать 200 символов.";
+    } elseif ($projectCount >= 100) {
+        // Ошибка, если проектов уже 100 или больше
+        $error = "Вы достигли лимита! Максимум можно создать 100 проектов. Удалите неактуальные проекты, чтобы создать новые.";
     } else {
         // 1️⃣ Создаём проект
         $stmt = $db->prepare("
