@@ -1,11 +1,19 @@
 <?php
-require_once 'database.php';
+session_start();
+require_once 'database.php'; // Убедитесь, что путь правильный (возможно 'config/database.php')
 
+// Если пользователь не авторизован, отправляем на логин
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit;
+}
+
+$user_id = $_SESSION['user_id'];
 $db = (new Database())->getConnection();
 
-
-$stmt = $db->prepare("SELECT id, name FROM projects ORDER BY name ASC");
-$stmt->execute();
+// Выбираем только те проекты, где текущий пользователь является владельцем
+$stmt = $db->prepare("SELECT id, name FROM projects WHERE owner_id = :user_id ORDER BY name ASC");
+$stmt->execute(['user_id' => $user_id]);
 $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $fieldErrors = [];
@@ -37,11 +45,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fieldErrors['deadline'] = "Некорректная дата";
     }
 
+// Было: "SELECT COUNT(*) FROM projects WHERE id = :id"
 if ($project_id) {
-    $check = $db->prepare("SELECT COUNT(*) FROM projects WHERE id = :id");
-    $check->execute(["id" => $project_id]);
+    // Стало: проверяем не только ID проекта, но и его владельца!
+    $check = $db->prepare("SELECT COUNT(*) FROM projects WHERE id = :id AND owner_id = :user_id");
+    $check->execute([
+        "id" => $project_id,
+        "user_id" => $user_id
+    ]);
+    
     if ($check->fetchColumn() == 0) {
-        $fieldErrors['project_id'] = "Выбранный проект не существует";
+        $fieldErrors['project_id'] = "Выбранный проект не существует или у вас нет к нему доступа";
     }
 } else {
     $fieldErrors['project_id'] = "Выберите проект";
