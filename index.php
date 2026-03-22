@@ -607,6 +607,22 @@ async function removeUserFromProject(projectId, userId, email) {
     const data = await r.json();
     if (data.success) openMembersModal(projectId);
     else alert('Ошибка: ' + data.error);
+async function loadMembersForTask(projectId) {
+    const select = document.getElementById('taskAssignedTo');
+    select.innerHTML = '<option value="">Загрузка...</option>';
+
+    try {
+        const response = await fetch(`get_members_list.php?project_id=${projectId}`);
+        const members = await response.json();
+
+        select.innerHTML = '<option value="">-- Не назначено --</option>';
+        members.forEach(m => {
+            select.innerHTML += `<option value="${m.id}">${m.email}</option>`;
+        });
+    } catch (error) {
+        select.innerHTML = '<option value="">Ошибка загрузки</option>';
+    }
+}
 }
 </script>
 </body>

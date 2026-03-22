@@ -15,16 +15,22 @@ $task_id = $_GET['id'];
 $database = new Database();
 $db = $database->getConnection();
 
+// ... код авторизации и проверки ID ...
+
 $stmt = $db->prepare("
-    SELECT t.* FROM tasks t
+    SELECT t.*, u.email as executor_email, u.name as executor_name 
+    FROM tasks t
     JOIN projects p ON t.project_id = p.id
     LEFT JOIN project_members pm ON p.id = pm.project_id
+    LEFT JOIN users u ON t.assigned_to = u.id
     WHERE t.id = :task_id 
       AND (p.owner_id = :user_id OR pm.user_id = :user_id)
     LIMIT 1
 ");
 $stmt->execute(['task_id' => $task_id, 'user_id' => $_SESSION['user_id']]);
 $task = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// ... дальше проверка на !$task ...
 
 if (!$task) {
     die("Ошибка: Задача не найдена или у вас нет прав доступа.");
@@ -373,12 +379,24 @@ $priorityColors = ['low' => 'var(--green)', 'medium' => 'var(--yellow)', 'high' 
             <span class="detail-val"><?= $statusLabels[$task['status']] ?? $task['status'] ?></span>
         </div>
         <div class="detail-row">
+    <span class="detail-key">Исполнитель</span>
+    <span class="detail-val">
+        <?php if ($task['executor_email']): ?>
+            <span style="color: var(--accent); font-weight: 600;">👤</span> 
+            <?= htmlspecialchars($task['executor_name'] ?: $task['executor_email']) ?>
+        <?php else: ?>
+            <span class="text-dim">Не назначен</span>
+        <?php endif; ?>
+    </span>
+</div>
+        <div class="detail-row">
             <span class="detail-key">Приоритет</span>
             <span class="detail-val">
                 <span class="priority-dot" style="background:<?= $priorityColors[$task['priority']] ?? '#aaa' ?>;"></span>
                 <?= $priorityLabels[$task['priority']] ?? $task['priority'] ?>
             </span>
         </div>
+        
         <div class="detail-row">
             <span class="detail-key">Дедлайн</span>
             <span class="detail-val mono">
