@@ -1,7 +1,7 @@
 <?php
 session_start();
 require_once 'config/database.php';
-// Подключаем PHPMailer (убедись, что пути верны)
+// Подключаем PHPMailer
 require 'libs/PHPMailer/Exception.php';
 require 'libs/PHPMailer/PHPMailer.php';
 require 'libs/PHPMailer/SMTP.php';
@@ -17,7 +17,12 @@ if (!isset($_SESSION['user_id'])) {
 $user_id = $_SESSION['user_id'];
 $db = (new Database())->getConnection();
 
-// Получаем проекты, где пользователь владелец ИЛИ участник (чтобы он мог создавать задачи везде, где есть доступ)
+// --- ФУНКЦИЯ ЛОГИРОВАНИЯ ---
+function logActivity($db, $projectId, $userId, $details, $taskId = null) {
+    $stmt = $db->prepare("INSERT INTO project_activity (project_id, user_id, details, task_id) VALUES (?, ?, ?, ?)");
+    $stmt->execute([$projectId, $userId, $details, $taskId]);
+}
+
 $stmt = $db->prepare("
     SELECT id, name FROM projects WHERE owner_id = :user_id 
     UNION 
@@ -40,12 +45,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $project_id  = $_POST['project_id'] ?? null;
     $assigned_to = !empty($_POST['assigned_to']) ? (int)$_POST['assigned_to'] : null;
 
-    // Валидация (твоя существующая)
     if ($title === '' || strlen($title) > 200) { $fieldErrors['title'] = "Название обязательно"; }
     if (!in_array($priority, ['low','medium','high'])) { $fieldErrors['priority'] = "Некорректный приоритет"; }
     
     if ($project_id) {
-        // Проверка прав на проект (теперь учитываем и участников)
         $check = $db->prepare("
             SELECT COUNT(*) FROM projects p 
             LEFT JOIN project_members pm ON p.id = pm.project_id 
@@ -60,7 +63,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (!$fieldErrors) {
-        // Сохранение с полем assigned_to
         $stmt = $db->prepare("
             INSERT INTO tasks(title, description, priority, deadline, project_id, assigned_to, status)
             VALUES(:title, :description, :priority, :deadline, :project_id, :assigned_to, 'new')
@@ -73,7 +75,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->bindValue(":deadline", $deadline ?: null, $deadline ? PDO::PARAM_STR : PDO::PARAM_NULL);
         
         if ($stmt->execute()) {
-            // ОТПРАВКА УВЕДОМЛЕНИЯ
+            $lastTaskId = $db->lastInsertId();
+            // Вызов функции логирования теперь сработает
+            logActivity($db, $project_id, $user_id, "создал(а) задачу: " . htmlspecialchars($title), $lastTaskId);
+            
             if ($assigned_to) {
                 $stmtUser = $db->prepare("SELECT email FROM users WHERE id = ?");
                 $stmtUser->execute([$assigned_to]);
@@ -85,8 +90,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $mail->isSMTP();
                         $mail->Host       = 'smtp.gmail.com'; 
                         $mail->SMTPAuth   = true;
-                        $mail->Username   = 'rdd294428@gmail.com'; // ТВОЯ ПОЧТА
-                        $mail->Password   = 'wgfmtauhcjrelyil';    // ТВОЙ ПАРОЛЬ ПРИЛОЖЕНИЯ
+                        $mail->Username   = 'rdd294428@gmail.com';
+                        $mail->Password   = 'wgfmtauhcjrelyil';
                         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
                         $mail->Port       = 587;
                         $mail->CharSet    = 'UTF-8';
@@ -97,9 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $mail->Subject = "Вам назначена задача: $title";
                         $mail->Body    = "Привет! Вам назначена новая задача в проекте. <br><b>Название:</b> $title <br><b>Приоритет:</b> $priority";
                         $mail->send();
-                    } catch (Exception $e) {
-                        // Тихая ошибка (по примечанию)
-                    }
+                    } catch (Exception $e) {}
                 }
             }
             $success = "Задача успешно создана!";

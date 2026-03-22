@@ -45,7 +45,16 @@ $stmtComments = $db->prepare("
 ");
 $stmtComments->execute([$task_id]);
 $comments = $stmtComments->fetchAll(PDO::FETCH_ASSOC);
-
+// Получаем историю изменений именно для этой задачи
+$stmtHistory = $db->prepare("
+    SELECT a.*, u.name as user_name, u.email as user_email
+    FROM project_activity a
+    JOIN users u ON a.user_id = u.id
+    WHERE a.task_id = ?
+    ORDER BY a.created_at DESC
+");
+$stmtHistory->execute([$task_id]);
+$history = $stmtHistory->fetchAll(PDO::FETCH_ASSOC);
 $statusLabels   = ['new' => 'Новые', 'working' => 'В работе', 'progress' => 'В процессе', 'done' => 'Завершены'];
 $priorityLabels = ['low' => 'Низкий', 'medium' => 'Средний', 'high' => 'Высокий'];
 $priorityColors = ['low' => 'var(--green)', 'medium' => 'var(--yellow)', 'high' => 'var(--red)'];
@@ -84,7 +93,43 @@ $priorityColors = ['low' => 'var(--green)', 'medium' => 'var(--yellow)', 'high' 
             display: flex;
             flex-direction: column;
         }
+/* HISTORY STYLES */
+.history-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 24px;
+    padding-left: 12px;
+    border-left: 2px solid var(--border);
+}
 
+.history-item {
+    position: relative;
+    font-size: 12px;
+    color: var(--text);
+}
+
+.history-item::before {
+    content: "";
+    position: absolute;
+    left: -17px;
+    top: 5px;
+    width: 8px;
+    height: 8px;
+    background: var(--border);
+    border-radius: 50%;
+    border: 2px solid var(--bg);
+}
+
+.history-meta {
+    color: var(--text-dim);
+    font-size: 11px;
+    margin-bottom: 2px;
+}
+
+.history-user { font-weight: 600; color: var(--text-head); }
+.history-date { font-family: 'JetBrains Mono', monospace; margin-left: 6px; }
+.history-details { line-height: 1.4; }
         /* TOPBAR */
         .topbar {
             height: 44px;
@@ -341,7 +386,24 @@ $priorityColors = ['low' => 'var(--green)', 'medium' => 'var(--yellow)', 'high' 
                 ? nl2br(htmlspecialchars($task['description']))
                 : '<em>Нет описания</em>' ?>
         </div>
-
+<div class="section-label">История изменений</div>
+<div class="history-wrap" id="history-list-<?= $task_id ?>">
+    <?php if (empty($history)): ?>
+        <div style="font-size:12px; color:var(--text-dim);">История изменений пуста.</div>
+    <?php else: ?>
+        <?php foreach ($history as $item): ?>
+            <div class="history-item">
+                <div class="history-meta">
+                    <span class="history-user"><?= htmlspecialchars($item['user_name'] ?: $item['user_email']) ?></span>
+                    <span class="history-date"><?= date('d.m H:i', strtotime($item['created_at'])) ?></span>
+                </div>
+                <div class="history-details">
+                    <?= htmlspecialchars($item['details']) ?>
+                </div>
+            </div>
+        <?php endforeach; ?>
+    <?php endif; ?>
+</div>
         <div class="section-label">Комментарии</div>
         <div class="comments-wrap" id="comments-list-<?= $task_id ?>">
             <?php if (empty($comments)): ?>
@@ -466,6 +528,27 @@ async function addComment(event, taskId) {
         submitBtn.disabled = false;
     }
 }
+// Функция обновления истории
+async function refreshHistory() {
+    const historyContainer = document.getElementById('history-list-<?= $task_id ?>');
+    if (!historyContainer) return;
+
+    try {
+        const response = await fetch(`get_task_history.php?task_id=<?= $task_id ?>`);
+        if (response.ok) {
+            const html = await response.text();
+            if (html.trim() !== "") {
+                historyContainer.innerHTML = html;
+            }
+        }
+    } catch (e) { console.error("History refresh failed"); }
+}
+
+// Обновляем каждые 5 секунд
+setInterval(refreshHistory, 5000);
+
+// Вызываем обновление сразу после добавления комментария (на всякий случай)
+// Вставь вызов refreshHistory() внутрь своей функции addComment после data.success
 </script>
 </body>
 </html>

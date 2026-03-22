@@ -1,11 +1,16 @@
 <?php
 session_start();
-require 'config/database.php'; // Правильный путь к твоей БД
+require 'config/database.php';
 
 header('Content-Type: application/json');
 
+// --- ФУНКЦИЯ ЛОГИРОВАНИЯ ---
+function logActivity($db, $projectId, $userId, $details, $taskId = null) {
+    $stmt = $db->prepare("INSERT INTO project_activity (project_id, user_id, details, task_id) VALUES (?, ?, ?, ?)");
+    $stmt->execute([$projectId, $userId, $details, $taskId]);
+}
+
 try {
-    // Проверка авторизации (как у тебя в index.php)
     if (!isset($_SESSION['user_id'])) {
         throw new Exception('Вы не авторизованы.');
     }
@@ -15,7 +20,7 @@ try {
     }
 
     $database = new Database();
-    $db = $database->getConnection(); // Используем твою переменную $db
+    $db = $database->getConnection();
 
     $task_id = $_POST['task_id'] ?? null;
     $comment_text = trim($_POST['comment'] ?? '');
@@ -29,13 +34,13 @@ try {
         throw new Exception('Комментарий слишком длинный. Максимум 500 символов.');
     }
 
-    // Сохраняем в БД (используем $db вместо $pdo)
+    // Сохраняем комментарий
     $stmt = $db->prepare("INSERT INTO task_comments (task_id, user_id, comment) VALUES (?, ?, ?)");
     $stmt->execute([$task_id, $user_id, $comment_text]);
     
     $comment_id = $db->lastInsertId();
 
-    // Получаем созданный комментарий
+    // Получаем созданный комментарий для вывода
     $stmt = $db->prepare("
         SELECT tc.comment, tc.created_at, u.name as author_name 
         FROM task_comments tc 
@@ -44,6 +49,16 @@ try {
     ");
     $stmt->execute([$comment_id]);
     $new_comment = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    // НОВОЕ: Получаем данные задачи для ленты активности
+    $stmtTask = $db->prepare("SELECT project_id, title FROM tasks WHERE id = ?");
+    $stmtTask->execute([$task_id]);
+    $taskData = $stmtTask->fetch(PDO::FETCH_ASSOC);
+
+    if ($taskData) {
+        // Записываем в лог
+        logActivity($db, $taskData['project_id'], $user_id, "добавил(а) комментарий к задаче: " . htmlspecialchars($taskData['title']), $task_id);
+    }
 
     echo json_encode(['success' => true, 'comment' => $new_comment]);
 
