@@ -12,7 +12,15 @@ $db = $database->getConnection();
 $user_id = $_SESSION['user_id'];
 
 // Получаем проекты
-$stmt = $db->prepare("SELECT id, name FROM projects WHERE owner_id = :user_id ORDER BY name");
+// Получаем и собственные проекты, и те, где пользователь — участник
+$stmt = $db->prepare("
+    SELECT p.id, p.name 
+    FROM projects p
+    LEFT JOIN project_members pm ON p.id = pm.project_id
+    WHERE p.owner_id = :user_id OR pm.user_id = :user_id
+    GROUP BY p.id
+    ORDER BY p.name
+");
 $stmt->execute(['user_id' => $user_id]);
 $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
@@ -89,6 +97,13 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <?php foreach ($projects as $project): ?>
         <div class="project-section mb-5">
             <h4 class="mb-3 border-bottom pb-2"><?= htmlspecialchars($project['name']) ?></h4>
+            <div class="mb-4">
+    <form class="d-flex align-items-center invite-form" onsubmit="inviteUser(event, <?= $project['id'] ?>)" style="max-width: 400px;">
+        <input type="email" name="email" class="form-control form-control-sm me-2" placeholder="Email коллеги для приглашения" required>
+        <button type="submit" class="btn btn-sm btn-outline-success">Пригласить</button>
+    </form>
+    <div id="invite-msg-<?= $project['id'] ?>" class="small mt-1" style="display: none;"></div>
+</div>
             <div class="row g-3">
                 <?php
                 $stmt = $db->prepare("SELECT * FROM tasks WHERE project_id = :pid ORDER BY created_at DESC");
@@ -119,14 +134,11 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <div class="text-muted small mb-2"><?= mb_strimwidth(htmlspecialchars($task['description']), 0, 80, "...") ?></div>
                                     <?php endif; ?>
                                     <div class="d-flex justify-content-between align-items-center mt-2">
-                                        <span class="badge bg-light text-dark border small" style="font-size: 0.65rem;">
-                                            <?= $task['deadline'] ? date('d.m', strtotime($task['deadline'])) : 'Нет срока' ?>
-                                        </span>
-                                        <div>
-                                            <a href="edit_task.php?id=<?= $task['id'] ?>" class="btn btn-sm p-0 px-1 text-primary">✎</a>
-                                            <a href="delete_task.php?id=<?= $task['id'] ?>" class="btn btn-sm p-0 px-1 text-danger">✖</a>
-                                        </div>
-                                    </div>
+    <span class="badge bg-light text-dark border small" style="font-size: 0.65rem;">
+        <?= $task['deadline'] ? date('d.m', strtotime($task['deadline'])) : 'Нет срока' ?>
+    </span>
+    <a href="view_task.php?id=<?= $task['id'] ?>" class="btn btn-sm btn-outline-primary" style="font-size: 0.7rem; padding: 2px 8px;">Открыть</a>
+</div>
                                 </div>
                             <?php endforeach; ?>
                         </div>
@@ -202,6 +214,44 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+async function inviteUser(event, projectId) {
+    event.preventDefault();
+    const form = event.target;
+    const formData = new FormData(form);
+    formData.append('project_id', projectId);
+    
+    const msgDiv = document.getElementById(`invite-msg-${projectId}`);
+    const submitBtn = form.querySelector('button[type="submit"]');
+    
+    submitBtn.disabled = true;
+    msgDiv.style.display = 'none';
+    
+    try {
+        const response = await fetch('invite_user.php', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await response.json();
+        
+        msgDiv.style.display = 'block';
+        if (data.success) {
+            msgDiv.className = 'small mt-1 text-success';
+            msgDiv.textContent = data.message;
+            form.reset();
+        } else {
+            msgDiv.className = 'small mt-1 text-danger';
+            msgDiv.textContent = data.error;
+        }
+    } catch (error) {
+        msgDiv.style.display = 'block';
+        msgDiv.className = 'small mt-1 text-danger';
+        msgDiv.textContent = 'Ошибка сети. Попробуйте позже.';
+    } finally {
+        submitBtn.disabled = false;
+        // Скрываем сообщение об успехе через 5 секунд
+        setTimeout(() => { if(msgDiv.className.includes('text-success')) msgDiv.style.display = 'none'; }, 5000);
+    }
+}
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
