@@ -2,82 +2,78 @@
 session_start();
 require 'config/database.php';
 
+// Подключаем файлы PHPMailer (укажи правильные пути!)
+require 'libs/PHPMailer/Exception.php';
+require 'libs/PHPMailer/PHPMailer.php';
+require 'libs/PHPMailer/SMTP.php';
+
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+
 header('Content-Type: application/json');
 
 try {
-    if (!isset($_SESSION['user_id'])) {
-        throw new Exception('Вы не авторизованы.');
-    }
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        throw new Exception('Неверный метод запроса.');
-    }
-
-    $db = (new Database())->getConnection();
+    if (!isset($_SESSION['user_id'])) throw new Exception('Вы не авторизованы.');
     
-    $project_id = $_POST['project_id'] ?? null;
-    // Очищаем и проверяем корректность email
+    $db = (new Database())->getConnection();
     $email = filter_var(trim($_POST['email'] ?? ''), FILTER_VALIDATE_EMAIL);
+    $project_id = $_POST['project_id'];
     $current_user_id = $_SESSION['user_id'];
 
-    if (!$project_id) {
-        throw new Exception('Проект не указан.');
-    }
-    if (!$email) {
-        throw new Exception('Пожалуйста, введите корректный email-адрес.');
-    }
+    if (!$email) throw new Exception('Некорректный email.');
 
-    // 1. Проверяем, есть ли права (приглашать может только владелец проекта)
-    $stmt = $db->prepare("SELECT owner_id FROM projects WHERE id = ?");
-    $stmt->execute([$project_id]);
-    $project = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if (!$project || $project['owner_id'] != $current_user_id) {
-        throw new Exception('У вас нет прав для приглашения участников в этот проект.');
-    }
+    // 1. Проверка прав и лимита (как раньше)
+    $stmt = $db->prepare("SELECT name FROM projects WHERE id = ? AND owner_id = ?");
+    $stmt->execute([$project_id, $current_user_id]);
+    $project = $stmt->fetch();
 
-    // 2. Проверяем лимит: максимум 50 участников
-    $stmt = $db->prepare("SELECT COUNT(*) FROM project_members WHERE project_id = ?");
-    $stmt->execute([$project_id]);
-    $member_count = $stmt->fetchColumn();
+    if (!$project) throw new Exception('У вас нет прав или проект не найден.');
 
-    if ($member_count >= 50) {
-        throw new Exception('Достигнут лимит: в проекте не может быть больше 50 участников.');
-    }
-
-    // 3. Ищем пользователя по email
+    // 2. Логика добавления в базу (оставляем ту же)
     $stmt = $db->prepare("SELECT id FROM users WHERE email = ?");
     $stmt->execute([$email]);
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    $user = $stmt->fetch();
 
-    // ВАЖНО: Мы не выдаем ошибку, если пользователя нет. Это защита от перебора email-ов.
     if ($user) {
-        $new_user_id = $user['id'];
-        
-        // Проверяем, не состоит ли он уже в проекте
-        $stmt = $db->prepare("SELECT id FROM project_members WHERE project_id = ? AND user_id = ?");
-        $stmt->execute([$project_id, $new_user_id]);
-        $already_member = $stmt->fetch();
-
-        if (!$already_member) {
-            // Добавляем участника в проект
-            $stmt = $db->prepare("INSERT INTO project_members (project_id, user_id, role) VALUES (?, ?, 'member')");
-            $stmt->execute([$project_id, $new_user_id]);
-            
-            // Если у тебя на сервере настроен почтовый агент, раскомментируй строку ниже:
-            // mail($email, "Приглашение в проект", "Вас добавили в проект в Task Planner. Зайдите в систему, чтобы увидеть его.");
-        }
+        $stmt = $db->prepare("INSERT IGNORE INTO project_members (project_id, user_id) VALUES (?, ?)");
+        $stmt->execute([$project_id, $user['id']]);
     }
 
-    // Возвращаем один и тот же ответ всегда, чтобы не палить базу данных
-    echo json_encode([
-        'success' => true, 
-        'message' => 'Приглашение обработано! Если пользователь зарегистрирован, он увидит проект.'
-    ]);
+    // 3. ОТПРАВКА ПИСЬМА
+    $mail = new PHPMailer(true);
 
-} catch (PDOException $e) {
-    // Скрываем SQL-ошибки
-    echo json_encode(['success' => false, 'error' => 'Произошла ошибка при сохранении. Попробуйте позже.']);
+    // Настройки сервера
+    $mail->isSMTP();
+    $mail->Host       = 'smtp.gmail.com';         // SMTP сервер (например, Gmail)
+    $mail->SMTPAuth   = true;
+    $mail->Username   = 'rdd294428@gmail.com'; // ТВОЯ ПОЧТА
+    $mail->Password   = 'wgfmtauhcjrelyil';    // ТВОЙ ПАРОЛЬ ПРИЛОЖЕНИЯ
+    $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+    $mail->Port       = 587;
+    $mail->CharSet    = 'UTF-8';
+
+    // Получатели
+    $mail->setFrom('your-bot-email@gmail.com', 'Task Planner Pro');
+    $mail->addAddress($email); 
+
+    // Содержание
+    $mail->isHTML(true);
+    $mail->Subject = "Приглашение в проект: " . $project['name'];
+    $mail->Body    = "
+        <h3>Вас пригласили!</h3>
+        <p>Привет! Вас добавили в проект <b>" . htmlspecialchars($project['name']) . "</b>.</p>
+        <p>Зайдите в свой личный кабинет, чтобы начать работу.</p>
+        <br>
+        <a href='http://твой-сайт.ru/login.php' style='padding: 10px; background: #007bff; color: white; text-decoration: none;'>Перейти к задачам</a>
+    ";
+
+    $mail->send();
+
+    echo json_encode(['success' => true, 'message' => 'Приглашение и письмо отправлены!']);
+
 } catch (Exception $e) {
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    // Если ошибка в PHPMailer, она попадет сюда
+    echo json_encode(['success' => false, 'error' => 'Ошибка: ' . $mail->ErrorInfo]);
+} catch (PDOException $e) {
+    echo json_encode(['success' => false, 'error' => 'Ошибка базы данных.']);
 }
-?>

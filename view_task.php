@@ -15,8 +15,6 @@ $task_id = $_GET['id'];
 $database = new Database();
 $db = $database->getConnection();
 
-// Получаем информацию о задаче
-// SQL-запрос с двойной проверкой доступа
 $stmt = $db->prepare("
     SELECT t.* FROM tasks t
     JOIN projects p ON t.project_id = p.id
@@ -25,19 +23,13 @@ $stmt = $db->prepare("
       AND (p.owner_id = :user_id OR pm.user_id = :user_id)
     LIMIT 1
 ");
-
-$stmt->execute([
-    'task_id' => $task_id,
-    'user_id' => $_SESSION['user_id']
-]);
+$stmt->execute(['task_id' => $task_id, 'user_id' => $_SESSION['user_id']]);
 $task = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$task) {
-    // Если задача чужая или её нет — выдаем 404 или просто ошибку
     die("Ошибка: Задача не найдена или у вас нет прав доступа.");
 }
 
-// Получаем комментарии к этой задаче
 $stmtComments = $db->prepare("
     SELECT tc.*, u.name as author_name 
     FROM task_comments tc 
@@ -47,110 +39,375 @@ $stmtComments = $db->prepare("
 ");
 $stmtComments->execute([$task_id]);
 $comments = $stmtComments->fetchAll(PDO::FETCH_ASSOC);
-?>
 
+$statusLabels   = ['new' => 'Новые', 'working' => 'В работе', 'progress' => 'В процессе', 'done' => 'Завершены'];
+$priorityLabels = ['low' => 'Низкий', 'medium' => 'Средний', 'high' => 'Высокий'];
+$priorityColors = ['low' => 'var(--green)', 'medium' => 'var(--yellow)', 'high' => 'var(--red)'];
+?>
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title><?= htmlspecialchars($task['title']) ?> - Task Planner</title>
+    <title><?= htmlspecialchars($task['title']) ?> — Task Planner</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { background: #f4f6f9; }
-        .comment-box { background: white; border-radius: 8px; padding: 15px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        :root {
+            --bg:        #f0f2f5;
+            --surface:   #ffffff;
+            --surface2:  #f7f8fa;
+            --border:    #dde1e7;
+            --text:      #3d4452;
+            --text-dim:  #8b95a5;
+            --text-head: #1a1f2e;
+            --accent:    #2b6be6;
+            --red:       #e53935;
+            --yellow:    #e8a000;
+            --green:     #1e9e52;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'IBM Plex Sans', sans-serif;
+            font-size: 13px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* TOPBAR */
+        .topbar {
+            height: 44px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        .topbar-brand {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--accent);
+            letter-spacing: 0.05em;
+            margin-right: 12px;
+            text-decoration: none;
+        }
+        .topbar-sep { width: 1px; height: 20px; background: var(--border); }
+        .topbar-btn {
+            height: 28px;
+            padding: 0 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text);
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: background .15s, border-color .15s, color .15s;
+        }
+        .topbar-btn:hover { background: var(--surface2); border-color: #b0b8c8; color: var(--text-head); }
+        .topbar-btn.primary { border-color: var(--accent); color: var(--accent); }
+        .topbar-btn.primary:hover { background: rgba(43,107,230,.08); }
+        .topbar-btn.danger { border-color: #f5c6c6; color: var(--red); }
+        .topbar-btn.danger:hover { background: rgba(229,57,53,.06); border-color: var(--red); }
+        .topbar-spacer { flex: 1; }
+
+        /* BREADCRUMB BAR */
+        .breadbar {
+            height: 36px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+        .breadbar a { color: var(--accent); text-decoration: none; }
+        .breadbar a:hover { text-decoration: underline; }
+        .breadbar-sep { color: var(--border); }
+        .breadbar-current { color: var(--text-head); font-weight: 500; }
+        .task-id-badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            padding: 1px 6px;
+            color: var(--text-dim);
+        }
+
+        /* CONTENT */
+        .page-content {
+            flex: 1;
+            display: flex;
+            gap: 0;
+            overflow: hidden;
+        }
+
+        /* MAIN PANEL */
+        .main-panel {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 24px;
+            border-right: 1px solid var(--border);
+        }
+        .main-panel::-webkit-scrollbar { width: 4px; }
+        .main-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+        .task-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-head);
+            line-height: 1.4;
+            margin-bottom: 16px;
+        }
+
+        .section-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .07em;
+            color: var(--text-dim);
+            margin-bottom: 8px;
+        }
+
+        .desc-block {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 14px 16px;
+            font-size: 13px;
+            line-height: 1.6;
+            color: var(--text);
+            margin-bottom: 24px;
+            min-height: 60px;
+        }
+        .desc-block em { color: var(--text-dim); }
+
+        /* COMMENTS */
+        .comments-wrap { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+
+        .comment-item {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px 14px;
+        }
+        .comment-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+        .comment-author {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-head);
+        }
+        .comment-date {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--text-dim);
+        }
+        .comment-text {
+            font-size: 12px;
+            line-height: 1.5;
+            color: var(--text);
+        }
+
+        /* COMMENT FORM */
+        .comment-form-wrap {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px 14px;
+        }
+        .tp-textarea {
+            width: 100%;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            font-family: 'IBM Plex Sans', sans-serif;
+            font-size: 12px;
+            padding: 8px 10px;
+            resize: vertical;
+            outline: none;
+            transition: border-color .15s;
+            min-height: 72px;
+        }
+        .tp-textarea:focus { border-color: var(--accent); }
+        .tp-textarea::placeholder { color: var(--text-dim); }
+
+        /* SIDEBAR */
+        .side-panel {
+            width: 240px;
+            min-width: 240px;
+            overflow-y: auto;
+            padding: 20px 16px;
+            background: var(--surface);
+        }
+        .side-panel::-webkit-scrollbar { width: 3px; }
+        .side-panel::-webkit-scrollbar-thumb { background: var(--border); }
+
+        .detail-row {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .detail-row:last-child { border-bottom: none; }
+        .detail-key {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .07em;
+            color: var(--text-dim);
+        }
+        .detail-val {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-head);
+        }
+        .priority-dot {
+            display: inline-block;
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+        .mono { font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+
+        .side-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 16px;
+        }
+
+        .error-msg { font-size: 11px; color: var(--red); margin-top: 6px; }
     </style>
 </head>
 <body>
 
-<nav class="navbar navbar-dark bg-dark mb-4">
-    <div class="container-fluid">
-        <a href="index.php" class="navbar-brand">← Назад к доске</a>
-    </div>
-</nav>
+<!-- TOPBAR -->
+<div class="topbar">
+    <a href="index.php" class="topbar-brand">⬡ Task Planner</a>
+    <div class="topbar-sep"></div>
+    <span class="task-id-badge">#<?= $task['id'] ?></span>
+    <div class="topbar-spacer"></div>
+    <a href="edit_task.php?id=<?= $task['id'] ?>" class="topbar-btn primary">Редактировать</a>
+    <a href="delete_task.php?id=<?= $task['id'] ?>" class="topbar-btn danger"
+       onclick="return confirm('Удалить задачу?')">Удалить</a>
+</div>
 
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-md-8">
-            <div class="card shadow-sm mb-4">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start mb-3">
-                        <h2 class="card-title"><?= htmlspecialchars($task['title']) ?></h2>
-                        <div>
-                            <a href="edit_task.php?id=<?= $task['id'] ?>" class="btn btn-outline-primary btn-sm">Редактировать</a>
-                            <a href="delete_task.php?id=<?= $task['id'] ?>" class="btn btn-outline-danger btn-sm" onclick="return confirm('Удалить задачу?')">Удалить</a>
-                        </div>
-                    </div>
-                    
-                    <h6 class="text-muted">Описание:</h6>
-                    <p class="card-text">
-                        <?= !empty($task['description']) ? nl2br(htmlspecialchars($task['description'])) : '<em>Нет описания</em>' ?>
-                    </p>
-                </div>
-            </div>
+<!-- BREADCRUMB -->
+<div class="breadbar">
+    <a href="index.php">Доска</a>
+    <span class="breadbar-sep">›</span>
+    <span class="breadbar-current"><?= htmlspecialchars($task['title']) ?></span>
+</div>
 
-            <div class="card shadow-sm">
-                <div class="card-body">
-                    <h5 class="mb-4">Комментарии</h5>
-                    
-                    <div id="comments-list-<?= $task_id ?>">
-                        <?php if (empty($comments)): ?>
-                            <p id="no-comments-msg" class="text-muted">Пока нет комментариев.</p>
-                        <?php else: ?>
-                            <?php foreach ($comments as $comment): ?>
-                                <div class="comment-box">
-                                    <div class="d-flex justify-content-between mb-1">
-                                        <strong><?= htmlspecialchars($comment['author_name']) ?></strong>
-                                        <small class="text-muted"><?= date('d.m.Y H:i', strtotime($comment['created_at'])) ?></small>
-                                    </div>
-                                    <div class="mb-0"><?= nl2br(htmlspecialchars($comment['comment'])) ?></div>
-                                </div>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </div>
+<!-- CONTENT -->
+<div class="page-content">
 
-                    <hr>
-                    
-                    <form id="comment-form-<?= $task_id ?>" onsubmit="addComment(event, <?= $task_id ?>)">
-                        <input type="hidden" name="task_id" value="<?= $task_id ?>">
-                        <div class="mb-3">
-                            <textarea name="comment" class="form-control" rows="3" required maxlength="500" placeholder="Напишите комментарий..."></textarea>
-                        </div>
-                        <button type="submit" class="btn btn-success">Отправить</button>
-                        <div class="comment-error text-danger mt-2" style="display: none;"></div>
-                    </form>
-                </div>
-            </div>
+    <!-- MAIN -->
+    <div class="main-panel">
+        <div class="task-title"><?= htmlspecialchars($task['title']) ?></div>
+
+        <div class="section-label">Описание</div>
+        <div class="desc-block">
+            <?= !empty($task['description'])
+                ? nl2br(htmlspecialchars($task['description']))
+                : '<em>Нет описания</em>' ?>
         </div>
 
-        <div class="col-md-4">
-            <div class="card shadow-sm">
-                <div class="card-body">
-                    <h5 class="card-title mb-3">Детали</h5>
-                    <ul class="list-group list-group-flush">
-                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
-                            Статус: <strong><?= htmlspecialchars($task['status']) ?></strong>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
-                            Приоритет: <strong><?= htmlspecialchars($task['priority']) ?></strong>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
-                            Дедлайн: <strong><?= $task['deadline'] ? date('d.m.Y H:i', strtotime($task['deadline'])) : 'Не указан' ?></strong>
-                        </li>
-                    </ul>
+        <div class="section-label">Комментарии</div>
+        <div class="comments-wrap" id="comments-list-<?= $task_id ?>">
+            <?php if (empty($comments)): ?>
+                <div id="no-comments-msg" style="font-size:12px;color:var(--text-dim);">Пока нет комментариев.</div>
+            <?php else: ?>
+                <?php foreach ($comments as $c): ?>
+                <div class="comment-item">
+                    <div class="comment-meta">
+                        <span class="comment-author"><?= htmlspecialchars($c['author_name']) ?></span>
+                        <span class="comment-date"><?= date('d.m.Y H:i', strtotime($c['created_at'])) ?></span>
+                    </div>
+                    <div class="comment-text"><?= nl2br(htmlspecialchars($c['comment'])) ?></div>
                 </div>
-            </div>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+
+        <div class="comment-form-wrap">
+            <form id="comment-form-<?= $task_id ?>" onsubmit="addComment(event, <?= $task_id ?>)" style="display:flex;flex-direction:column;gap:8px;">
+                <input type="hidden" name="task_id" value="<?= $task_id ?>">
+                <textarea name="comment" class="tp-textarea" rows="3" maxlength="500"
+                          placeholder="Напишите комментарий..." required></textarea>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <button type="submit" class="topbar-btn primary">Отправить</button>
+                    <div class="comment-error error-msg" style="display:none;"></div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- SIDEBAR -->
+    <div class="side-panel">
+        <div class="detail-row">
+            <span class="detail-key">Статус</span>
+            <span class="detail-val"><?= $statusLabels[$task['status']] ?? $task['status'] ?></span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-key">Приоритет</span>
+            <span class="detail-val">
+                <span class="priority-dot" style="background:<?= $priorityColors[$task['priority']] ?? '#aaa' ?>;"></span>
+                <?= $priorityLabels[$task['priority']] ?? $task['priority'] ?>
+            </span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-key">Дедлайн</span>
+            <span class="detail-val mono">
+                <?= $task['deadline'] ? date('d.m.Y H:i', strtotime($task['deadline'])) : '—' ?>
+            </span>
+        </div>
+        <div class="detail-row">
+            <span class="detail-key">Создана</span>
+            <span class="detail-val mono">
+                <?= date('d.m.Y', strtotime($task['created_at'])) ?>
+            </span>
+        </div>
+
+        <div class="side-actions">
+            <a href="edit_task.php?id=<?= $task['id'] ?>" class="topbar-btn primary" style="justify-content:center;">Редактировать</a>
+            <a href="delete_task.php?id=<?= $task['id'] ?>" class="topbar-btn danger" style="justify-content:center;"
+               onclick="return confirm('Удалить задачу?')">Удалить</a>
+            <a href="index.php" class="topbar-btn" style="justify-content:center;">← На доску</a>
         </div>
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-// Тот самый скрипт для добавления комментариев без перезагрузки
 async function addComment(event, taskId) {
     event.preventDefault();
-
-    const form = document.getElementById(`comment-form-${taskId}`);
-    const formData = new FormData(form);
-    const errorDiv = form.querySelector('.comment-error');
+    const form      = document.getElementById(`comment-form-${taskId}`);
+    const formData  = new FormData(form);
+    const errorDiv  = form.querySelector('.comment-error');
     const submitBtn = form.querySelector('button[type="submit"]');
 
     errorDiv.style.display = 'none';
@@ -158,36 +415,34 @@ async function addComment(event, taskId) {
 
     try {
         const response = await fetch('add_comment.php', { method: 'POST', body: formData });
-        const data = await response.json();
+        const data     = await response.json();
 
         if (data.success) {
-            const commentsList = document.getElementById(`comments-list-${taskId}`);
-            const noCommentsMsg = document.getElementById('no-comments-msg');
-            if (noCommentsMsg) noCommentsMsg.remove(); // Убираем сообщение "Пока нет комментариев"
+            const list = document.getElementById(`comments-list-${taskId}`);
+            const noMsg = document.getElementById('no-comments-msg');
+            if (noMsg) noMsg.remove();
 
             const date = new Date(data.comment.created_at).toLocaleString('ru-RU', {
                 day: '2-digit', month: '2-digit', year: 'numeric',
                 hour: '2-digit', minute: '2-digit'
             }).replace(',', '');
-            
-            const commentHTML = `
-                <div class="comment-box">
-                    <div class="d-flex justify-content-between mb-1">
-                        <strong>${data.comment.author_name}</strong>
-                        <small class="text-muted">${date}</small>
-                    </div>
-                    <div class="mb-0">${data.comment.comment}</div>
-                </div>
-            `;
 
-            commentsList.insertAdjacentHTML('beforeend', commentHTML);
+            list.insertAdjacentHTML('beforeend', `
+                <div class="comment-item">
+                    <div class="comment-meta">
+                        <span class="comment-author">${data.comment.author_name}</span>
+                        <span class="comment-date">${date}</span>
+                    </div>
+                    <div class="comment-text">${data.comment.comment.replace(/\n/g,'<br>')}</div>
+                </div>
+            `);
             form.reset();
         } else {
-            errorDiv.textContent = data.error;
-            errorDiv.style.display = 'block';
+            errorDiv.textContent    = data.error;
+            errorDiv.style.display  = 'block';
         }
-    } catch (error) {
-        errorDiv.textContent = 'Ошибка соединения с сервером.';
+    } catch {
+        errorDiv.textContent   = 'Ошибка соединения с сервером.';
         errorDiv.style.display = 'block';
     } finally {
         submitBtn.disabled = false;
