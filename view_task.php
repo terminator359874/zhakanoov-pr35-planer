@@ -15,8 +15,6 @@ $task_id = $_GET['id'];
 $database = new Database();
 $db = $database->getConnection();
 
-// ... код авторизации и проверки ID ...
-
 $stmt = $db->prepare("
     SELECT t.*, u.email as executor_email, u.name as executor_name 
     FROM tasks t
@@ -29,8 +27,6 @@ $stmt = $db->prepare("
 ");
 $stmt->execute(['task_id' => $task_id, 'user_id' => $_SESSION['user_id']]);
 $task = $stmt->fetch(PDO::FETCH_ASSOC);
-
-// ... дальше проверка на !$task ...
 
 if (!$task) {
     die("Ошибка: Задача не найдена или у вас нет прав доступа.");
@@ -45,7 +41,7 @@ $stmtComments = $db->prepare("
 ");
 $stmtComments->execute([$task_id]);
 $comments = $stmtComments->fetchAll(PDO::FETCH_ASSOC);
-// Получаем историю изменений именно для этой задачи
+
 $stmtHistory = $db->prepare("
     SELECT a.*, u.name as user_name, u.email as user_email
     FROM project_activity a
@@ -55,7 +51,19 @@ $stmtHistory = $db->prepare("
 ");
 $stmtHistory->execute([$task_id]);
 $history = $stmtHistory->fetchAll(PDO::FETCH_ASSOC);
-$statusLabels   = ['new' => 'Новые', 'working' => 'В работе', 'progress' => 'В процессе', 'done' => 'Завершены'];
+
+$statusLabels = [
+    'new'      => 'Новая',
+    'progress' => 'В процессе',
+    'done'     => 'Завершена',
+    'deferred' => 'Отложена',
+];
+$statusColors = [
+    'new'      => '#9ca3af',
+    'progress' => 'var(--accent)',
+    'done'     => 'var(--green)',
+    'deferred' => 'var(--yellow)',
+];
 $priorityLabels = ['low' => 'Низкий', 'medium' => 'Средний', 'high' => 'Высокий'];
 $priorityColors = ['low' => 'var(--green)', 'medium' => 'var(--yellow)', 'high' => 'var(--red)'];
 ?>
@@ -93,43 +101,7 @@ $priorityColors = ['low' => 'var(--green)', 'medium' => 'var(--yellow)', 'high' 
             display: flex;
             flex-direction: column;
         }
-/* HISTORY STYLES */
-.history-wrap {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    margin-bottom: 24px;
-    padding-left: 12px;
-    border-left: 2px solid var(--border);
-}
 
-.history-item {
-    position: relative;
-    font-size: 12px;
-    color: var(--text);
-}
-
-.history-item::before {
-    content: "";
-    position: absolute;
-    left: -17px;
-    top: 5px;
-    width: 8px;
-    height: 8px;
-    background: var(--border);
-    border-radius: 50%;
-    border: 2px solid var(--bg);
-}
-
-.history-meta {
-    color: var(--text-dim);
-    font-size: 11px;
-    margin-bottom: 2px;
-}
-
-.history-user { font-weight: 600; color: var(--text-head); }
-.history-date { font-family: 'JetBrains Mono', monospace; margin-left: 6px; }
-.history-details { line-height: 1.4; }
         /* TOPBAR */
         .topbar {
             height: 44px;
@@ -174,7 +146,7 @@ $priorityColors = ['low' => 'var(--green)', 'medium' => 'var(--yellow)', 'high' 
         .topbar-btn.danger:hover { background: rgba(229,57,53,.06); border-color: var(--red); }
         .topbar-spacer { flex: 1; }
 
-        /* BREADCRUMB BAR */
+        /* BREADCRUMB */
         .breadbar {
             height: 36px;
             background: var(--surface);
@@ -200,11 +172,10 @@ $priorityColors = ['low' => 'var(--green)', 'medium' => 'var(--yellow)', 'high' 
             color: var(--text-dim);
         }
 
-        /* CONTENT */
+        /* LAYOUT */
         .page-content {
             flex: 1;
             display: flex;
-            gap: 0;
             overflow: hidden;
         }
 
@@ -225,7 +196,6 @@ $priorityColors = ['low' => 'var(--green)', 'medium' => 'var(--yellow)', 'high' 
             line-height: 1.4;
             margin-bottom: 16px;
         }
-
         .section-label {
             font-size: 11px;
             font-weight: 600;
@@ -234,7 +204,6 @@ $priorityColors = ['low' => 'var(--green)', 'medium' => 'var(--yellow)', 'high' 
             color: var(--text-dim);
             margin-bottom: 8px;
         }
-
         .desc-block {
             background: var(--surface);
             border: 1px solid var(--border);
@@ -248,36 +217,43 @@ $priorityColors = ['low' => 'var(--green)', 'medium' => 'var(--yellow)', 'high' 
         }
         .desc-block em { color: var(--text-dim); }
 
-        /* COMMENTS */
-        .comments-wrap { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+        /* HISTORY */
+        .history-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 24px;
+            padding-left: 14px;
+            border-left: 2px solid var(--border);
+        }
+        .history-item { position: relative; font-size: 12px; }
+        .history-item::before {
+            content: '';
+            position: absolute;
+            left: -19px;
+            top: 5px;
+            width: 8px; height: 8px;
+            background: var(--border);
+            border-radius: 50%;
+            border: 2px solid var(--bg);
+        }
+        .history-meta { color: var(--text-dim); font-size: 11px; margin-bottom: 2px; }
+        .history-user { font-weight: 600; color: var(--text-head); }
+        .history-date { font-family: 'JetBrains Mono', monospace; margin-left: 6px; }
+        .history-details { line-height: 1.4; color: var(--text); }
 
+        /* COMMENTS */
+        .comments-wrap { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
         .comment-item {
             background: var(--surface);
             border: 1px solid var(--border);
             border-radius: 6px;
             padding: 10px 14px;
         }
-        .comment-meta {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 6px;
-        }
-        .comment-author {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--text-head);
-        }
-        .comment-date {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 10px;
-            color: var(--text-dim);
-        }
-        .comment-text {
-            font-size: 12px;
-            line-height: 1.5;
-            color: var(--text);
-        }
+        .comment-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+        .comment-author { font-size: 12px; font-weight: 600; color: var(--text-head); }
+        .comment-date { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-dim); }
+        .comment-text { font-size: 12px; line-height: 1.5; color: var(--text); }
 
         /* COMMENT FORM */
         .comment-form-wrap {
@@ -329,10 +305,19 @@ $priorityColors = ['low' => 'var(--green)', 'medium' => 'var(--yellow)', 'high' 
             letter-spacing: .07em;
             color: var(--text-dim);
         }
-        .detail-val {
+        .detail-val { font-size: 12px; font-weight: 500; color: var(--text-head); }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
             font-size: 12px;
             font-weight: 500;
-            color: var(--text-head);
+        }
+        .status-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
         }
         .priority-dot {
             display: inline-block;
@@ -343,13 +328,7 @@ $priorityColors = ['low' => 'var(--green)', 'medium' => 'var(--yellow)', 'high' 
         }
         .mono { font-family: 'JetBrains Mono', monospace; font-size: 11px; }
 
-        .side-actions {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            margin-top: 16px;
-        }
-
+        .side-actions { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; }
         .error-msg { font-size: 11px; color: var(--red); margin-top: 6px; }
     </style>
 </head>
@@ -386,24 +365,24 @@ $priorityColors = ['low' => 'var(--green)', 'medium' => 'var(--yellow)', 'high' 
                 ? nl2br(htmlspecialchars($task['description']))
                 : '<em>Нет описания</em>' ?>
         </div>
-<div class="section-label">История изменений</div>
-<div class="history-wrap" id="history-list-<?= $task_id ?>">
-    <?php if (empty($history)): ?>
-        <div style="font-size:12px; color:var(--text-dim);">История изменений пуста.</div>
-    <?php else: ?>
-        <?php foreach ($history as $item): ?>
-            <div class="history-item">
-                <div class="history-meta">
-                    <span class="history-user"><?= htmlspecialchars($item['user_name'] ?: $item['user_email']) ?></span>
-                    <span class="history-date"><?= date('d.m H:i', strtotime($item['created_at'])) ?></span>
+
+        <div class="section-label">История изменений</div>
+        <div class="history-wrap" id="history-list-<?= $task_id ?>">
+            <?php if (empty($history)): ?>
+                <div style="font-size:12px;color:var(--text-dim);">История изменений пуста.</div>
+            <?php else: ?>
+                <?php foreach ($history as $item): ?>
+                <div class="history-item">
+                    <div class="history-meta">
+                        <span class="history-user"><?= htmlspecialchars($item['user_name'] ?: $item['user_email']) ?></span>
+                        <span class="history-date"><?= date('d.m H:i', strtotime($item['created_at'])) ?></span>
+                    </div>
+                    <div class="history-details"><?= htmlspecialchars($item['details']) ?></div>
                 </div>
-                <div class="history-details">
-                    <?= htmlspecialchars($item['details']) ?>
-                </div>
-            </div>
-        <?php endforeach; ?>
-    <?php endif; ?>
-</div>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+
         <div class="section-label">Комментарии</div>
         <div class="comments-wrap" id="comments-list-<?= $task_id ?>">
             <?php if (empty($comments)): ?>
@@ -422,7 +401,8 @@ $priorityColors = ['low' => 'var(--green)', 'medium' => 'var(--yellow)', 'high' 
         </div>
 
         <div class="comment-form-wrap">
-            <form id="comment-form-<?= $task_id ?>" onsubmit="addComment(event, <?= $task_id ?>)" style="display:flex;flex-direction:column;gap:8px;">
+            <form id="comment-form-<?= $task_id ?>" onsubmit="addComment(event, <?= $task_id ?>)"
+                  style="display:flex;flex-direction:column;gap:8px;">
                 <input type="hidden" name="task_id" value="<?= $task_id ?>">
                 <textarea name="comment" class="tp-textarea" rows="3" maxlength="500"
                           placeholder="Напишите комментарий..." required></textarea>
@@ -438,19 +418,25 @@ $priorityColors = ['low' => 'var(--green)', 'medium' => 'var(--yellow)', 'high' 
     <div class="side-panel">
         <div class="detail-row">
             <span class="detail-key">Статус</span>
-            <span class="detail-val"><?= $statusLabels[$task['status']] ?? $task['status'] ?></span>
+            <span class="detail-val">
+                <span class="status-badge">
+                    <span class="status-dot" style="background:<?= $statusColors[$task['status']] ?? '#aaa' ?>;"></span>
+                    <?= $statusLabels[$task['status']] ?? $task['status'] ?>
+                </span>
+            </span>
         </div>
+
         <div class="detail-row">
-    <span class="detail-key">Исполнитель</span>
-    <span class="detail-val">
-        <?php if ($task['executor_email']): ?>
-            <span style="color: var(--accent); font-weight: 600;">👤</span> 
-            <?= htmlspecialchars($task['executor_name'] ?: $task['executor_email']) ?>
-        <?php else: ?>
-            <span class="text-dim">Не назначен</span>
-        <?php endif; ?>
-    </span>
-</div>
+            <span class="detail-key">Исполнитель</span>
+            <span class="detail-val">
+                <?php if (!empty($task['executor_email'])): ?>
+                    👤 <?= htmlspecialchars($task['executor_name'] ?: $task['executor_email']) ?>
+                <?php else: ?>
+                    <span style="color:var(--text-dim);font-weight:400;">Не назначен</span>
+                <?php endif; ?>
+            </span>
+        </div>
+
         <div class="detail-row">
             <span class="detail-key">Приоритет</span>
             <span class="detail-val">
@@ -458,13 +444,14 @@ $priorityColors = ['low' => 'var(--green)', 'medium' => 'var(--yellow)', 'high' 
                 <?= $priorityLabels[$task['priority']] ?? $task['priority'] ?>
             </span>
         </div>
-        
+
         <div class="detail-row">
             <span class="detail-key">Дедлайн</span>
             <span class="detail-val mono">
                 <?= $task['deadline'] ? date('d.m.Y H:i', strtotime($task['deadline'])) : '—' ?>
             </span>
         </div>
+
         <div class="detail-row">
             <span class="detail-key">Создана</span>
             <span class="detail-val mono">
@@ -498,7 +485,7 @@ async function addComment(event, taskId) {
         const data     = await response.json();
 
         if (data.success) {
-            const list = document.getElementById(`comments-list-${taskId}`);
+            const list  = document.getElementById(`comments-list-${taskId}`);
             const noMsg = document.getElementById('no-comments-msg');
             if (noMsg) noMsg.remove();
 
@@ -517,9 +504,10 @@ async function addComment(event, taskId) {
                 </div>
             `);
             form.reset();
+            refreshHistory();
         } else {
-            errorDiv.textContent    = data.error;
-            errorDiv.style.display  = 'block';
+            errorDiv.textContent   = data.error;
+            errorDiv.style.display = 'block';
         }
     } catch {
         errorDiv.textContent   = 'Ошибка соединения с сервером.';
@@ -528,27 +516,20 @@ async function addComment(event, taskId) {
         submitBtn.disabled = false;
     }
 }
-// Функция обновления истории
-async function refreshHistory() {
-    const historyContainer = document.getElementById('history-list-<?= $task_id ?>');
-    if (!historyContainer) return;
 
+async function refreshHistory() {
+    const container = document.getElementById('history-list-<?= $task_id ?>');
+    if (!container) return;
     try {
-        const response = await fetch(`get_task_history.php?task_id=<?= $task_id ?>`);
-        if (response.ok) {
-            const html = await response.text();
-            if (html.trim() !== "") {
-                historyContainer.innerHTML = html;
-            }
+        const r = await fetch('get_task_history.php?task_id=<?= $task_id ?>');
+        if (r.ok) {
+            const html = await r.text();
+            if (html.trim()) container.innerHTML = html;
         }
-    } catch (e) { console.error("History refresh failed"); }
+    } catch (e) { console.warn('History refresh failed'); }
 }
 
-// Обновляем каждые 5 секунд
 setInterval(refreshHistory, 5000);
-
-// Вызываем обновление сразу после добавления комментария (на всякий случай)
-// Вставь вызов refreshHistory() внутрь своей функции addComment после data.success
 </script>
 </body>
 </html>

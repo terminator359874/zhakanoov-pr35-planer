@@ -238,9 +238,9 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
         .col-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
         .dot-new      { background: #9ca3af; }
-        .dot-working  { background: var(--accent); }
-        .dot-progress { background: var(--yellow); }
+        .dot-progress { background: var(--accent); }
         .dot-done     { background: var(--green); }
+        .dot-deferred { background: var(--yellow); }
         .col-title {
             font-size: 12px;
             font-weight: 600;
@@ -458,10 +458,10 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $stmt->execute(['pid' => $project['id']]);
         $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $kanban = ['new' => [], 'working' => [], 'progress' => [], 'done' => []];
+        $kanban = ['new' => [], 'progress' => [], 'done' => [], 'deferred' => []];
         foreach ($tasks as $task) { $kanban[$task['status']][] = $task; }
-        $titles = ['new' => 'Новые', 'working' => 'В работе', 'progress' => 'В процессе', 'done' => 'Завершены'];
-        $dots   = ['new' => 'dot-new', 'working' => 'dot-working', 'progress' => 'dot-progress', 'done' => 'dot-done'];
+        $titles = ['new' => 'Новая', 'progress' => 'В процессе', 'done' => 'Завершена', 'deferred' => 'Отложена'];
+        $dots   = ['new' => 'dot-new', 'progress' => 'dot-progress', 'done' => 'dot-done', 'deferred' => 'dot-deferred'];
     ?>
     <div class="project-board" id="board-<?= $project['id'] ?>"
          style="display:<?= $i === 0 ? 'flex' : 'none' ?>;flex-direction:column;flex:1;overflow:hidden;">
