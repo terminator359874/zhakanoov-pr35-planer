@@ -45,7 +45,6 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
             --yellow:    #e8a000;
             --green:     #1e9e52;
             --col-w:     260px;
-            --sidebar-w: 280px;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -61,7 +60,7 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
             overflow: hidden;
         }
 
-        /* ── TOPBAR ── */
+        /* ── TOP NAV ── */
         .topbar {
             height: 44px;
             background: var(--surface);
@@ -97,11 +96,11 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
             gap: 5px;
             transition: background .15s, border-color .15s, color .15s;
         }
-        .topbar-btn:hover { background: var(--surface2); border-color: #b0b8c8; color: var(--text-head); }
+        .topbar-btn:hover { background: var(--surface2); border-color: #4a5160; color: var(--text-head); }
         .topbar-btn.primary { border-color: var(--accent); color: var(--accent); }
-        .topbar-btn.primary:hover { background: rgba(43,107,230,.08); }
-        .topbar-btn.danger { border-color: #f5c6c6; color: var(--red); }
-        .topbar-btn.danger:hover { background: rgba(229,57,53,.06); border-color: var(--red); }
+        .topbar-btn.primary:hover { background: rgba(76,120,255,.12); }
+        .topbar-btn.danger { border-color: #3d2424; color: #e07070; }
+        .topbar-btn.danger:hover { background: rgba(255,92,92,.1); border-color: var(--red); color: var(--red); }
         .topbar-spacer { flex: 1; }
 
         /* ── PROJECT TABS ── */
@@ -142,21 +141,6 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
             font-family: 'JetBrains Mono', monospace;
         }
 
-        /* ── MAIN AREA ── */
-        .main-area {
-            flex: 1;
-            display: flex;
-            overflow: hidden;
-        }
-
-        /* ── BOARD SIDE ── */
-        .board-side {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
         /* ── BOARD TOOLBAR ── */
         .board-toolbar {
             height: 38px;
@@ -176,11 +160,15 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
             color: var(--text-dim);
         }
         .board-toolbar-spacer { flex: 1; }
-        .invite-wrap { display: flex; align-items: center; gap: 6px; }
+        .invite-wrap {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
         .invite-wrap input {
             height: 26px;
             width: 200px;
-            background: var(--surface);
+            background: var(--surface2);
             border: 1px solid var(--border);
             border-radius: 4px;
             color: var(--text);
@@ -192,17 +180,6 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
         .invite-wrap input:focus { border-color: var(--accent); }
         .invite-wrap input::placeholder { color: var(--text-dim); }
         .invite-msg { font-size: 11px; }
-        .members-btn {
-            font-size: 11px;
-            padding: 3px 8px;
-            border-radius: 3px;
-            background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text-dim);
-            cursor: pointer;
-            transition: all .15s;
-        }
-        .members-btn:hover { border-color: #b0b8c8; color: var(--text); }
 
         /* ── BOARD CANVAS ── */
         .board-canvas {
@@ -216,7 +193,7 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
         .board-canvas::-webkit-scrollbar { height: 6px; }
         .board-canvas::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
-        /* ── KANBAN COLUMN ── */
+        /* ── COLUMN ── */
         .kanban-col {
             width: var(--col-w);
             min-width: var(--col-w);
@@ -236,11 +213,11 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
             border-bottom: 1px solid var(--border);
             flex-shrink: 0;
         }
-        .col-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-        .dot-new      { background: #9ca3af; }
-        .dot-progress { background: var(--accent); }
-        .dot-done     { background: var(--green); }
-        .dot-deferred { background: var(--yellow); }
+        .col-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
         .col-title {
             font-size: 12px;
             font-weight: 600;
@@ -272,15 +249,6 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
         .col-body::-webkit-scrollbar { width: 3px; }
         .col-body::-webkit-scrollbar-thumb { background: var(--border); }
-        .empty-col {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--text-dim);
-            font-size: 11px;
-            user-select: none;
-        }
 
         /* ── TASK CARD ── */
         .task-card {
@@ -292,7 +260,10 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
             transition: border-color .15s, box-shadow .15s, opacity .2s;
             position: relative;
         }
-        .task-card:hover { border-color: #b0b8c8; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+        .task-card:hover {
+            border-color: #4a5265;
+            box-shadow: 0 2px 8px rgba(0,0,0,.3);
+        }
         .task-card:active { cursor: grabbing; }
         .task-card::before {
             content: '';
@@ -304,6 +275,7 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
         .task-high::before   { background: var(--red); }
         .task-medium::before { background: var(--yellow); }
         .task-low::before    { background: var(--green); }
+
         .task-id {
             font-family: 'JetBrains Mono', monospace;
             font-size: 10px;
@@ -343,70 +315,28 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
             color: var(--accent);
             text-decoration: none;
             padding: 2px 6px;
-            border: 1px solid rgba(43,107,230,.25);
+            border: 1px solid rgba(76,120,255,.3);
             border-radius: 3px;
             transition: background .15s, border-color .15s;
         }
-        .task-open:hover { background: rgba(43,107,230,.08); border-color: var(--accent); }
+        .task-open:hover { background: rgba(76,120,255,.12); border-color: var(--accent); color: var(--accent); }
 
+        /* drag states */
         .sortable-ghost { opacity: .3; }
-        .task-updating  { opacity: .5; pointer-events: none; }
+        .task-updating { opacity: .5; pointer-events: none; }
 
-        /* ── ACTIVITY SIDEBAR ── */
-        .activity-sidebar {
-    width: var(--sidebar-w);
-    min-width: var(--sidebar-w);
-    background: var(--surface);
-    border-left: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    /* Добавьте эти строки: */
-    transition: margin-right 0.3s ease;
-}
-
-.activity-sidebar.collapsed {
-    margin-right: calc(var(--sidebar-w) * -1); /* Уводит сайдбар вправо */
-}
-        .sidebar-section {
-            display: flex;
-            flex-direction: column;
-        }
-        .sidebar-section.stats {
-            flex-shrink: 0;
-            border-bottom: 1px solid var(--border);
-        }
-        .sidebar-section.activity {
-            flex: 1;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        }
-        .sidebar-header {
-            height: 34px;
-            padding: 0 14px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            background: var(--surface2);
-            border-bottom: 1px solid var(--border);
-            font-size: 10px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: .08em;
+        /* ── MEMBERS BTN ── */
+        .members-btn {
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 3px;
+            background: transparent;
+            border: 1px solid var(--border);
             color: var(--text-dim);
-            flex-shrink: 0;
+            cursor: pointer;
+            transition: all .15s;
         }
-        .sidebar-body {
-            padding: 10px 14px;
-            overflow-y: auto;
-            font-size: 12px;
-            color: var(--text);
-        }
-        .sidebar-body::-webkit-scrollbar { width: 3px; }
-        .sidebar-body::-webkit-scrollbar-thumb { background: var(--border); }
-        .sidebar-section.stats .sidebar-body  { max-height: 160px; }
-        .sidebar-section.activity .sidebar-body { flex: 1; }
+        .members-btn:hover { border-color: #4a5265; color: var(--text); }
 
         /* ── MODAL ── */
         .modal-content {
@@ -415,23 +345,40 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
             color: var(--text);
         }
         .modal-header { border-bottom-color: var(--border); }
+        .modal-footer { border-top-color: var(--border); }
+        .btn-close { filter: none; }
 
         /* ── TOAST ── */
         .toast-container { z-index: 1060; }
         #saveToast { font-size: 12px; }
-        
+
+        /* ── EMPTY STATE ── */
+        .empty-col {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-dim);
+            font-size: 11px;
+            user-select: none;
+        }
+
+        /* dots for column colors */
+        .dot-new      { background: #6b7280; }
+        .dot-working  { background: var(--accent); }
+        .dot-progress { background: var(--yellow); }
+        .dot-done     { background: var(--green); }
     </style>
 </head>
 <body>
 
-<!-- TOPBAR -->
+<!-- TOP NAV -->
 <div class="topbar">
     <span class="topbar-brand">⬡ Task Planner</span>
     <div class="topbar-sep"></div>
     <a href="create_task.php" class="topbar-btn primary">+ Задача</a>
     <a href="create_project.php" class="topbar-btn">+ Проект</a>
     <div class="topbar-spacer"></div>
-    <button class="topbar-btn" onclick="toggleSidebar()">📊 Активность</button>
     <a href="logout.php" class="topbar-btn danger">Выйти</a>
 </div>
 
@@ -456,96 +403,79 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <?php endforeach; ?>
 </div>
 
-<!-- MAIN AREA -->
-<div class="main-area">
+<!-- PER-PROJECT BOARDS -->
+<?php foreach ($projects as $i => $project):
+    $stmt = $db->prepare("SELECT * FROM tasks WHERE project_id = :pid ORDER BY created_at DESC");
+    $stmt->execute(['pid' => $project['id']]);
+    $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    <!-- BOARD SIDE -->
-    <div class="board-side">
-    <?php foreach ($projects as $i => $project):
-        $stmt = $db->prepare("SELECT * FROM tasks WHERE project_id = :pid ORDER BY created_at DESC");
-        $stmt->execute(['pid' => $project['id']]);
-        $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $kanban = ['new' => [], 'working' => [], 'progress' => [], 'done' => []];
+    foreach ($tasks as $task) { $kanban[$task['status']][] = $task; }
+    $titles = ['new' => 'Новые', 'working' => 'В работе', 'progress' => 'В процессе', 'done' => 'Завершены'];
+    $dots   = ['new' => 'dot-new', 'working' => 'dot-working', 'progress' => 'dot-progress', 'done' => 'dot-done'];
+?>
+<div class="project-board" id="board-<?= $project['id'] ?>" style="<?= $i !== 0 ? 'display:none' : '' ?>;display:<?= $i === 0 ? 'flex' : 'none' ?>;flex-direction:column;flex:1;overflow:hidden;">
 
-        $kanban = ['new' => [], 'progress' => [], 'done' => [], 'deferred' => []];
-        foreach ($tasks as $task) { $kanban[$task['status']][] = $task; }
-        $titles = ['new' => 'Новая', 'progress' => 'В процессе', 'done' => 'Завершена', 'deferred' => 'Отложена'];
-        $dots   = ['new' => 'dot-new', 'progress' => 'dot-progress', 'done' => 'dot-done', 'deferred' => 'dot-deferred'];
-    ?>
-    <div class="project-board" id="board-<?= $project['id'] ?>"
-         style="display:<?= $i === 0 ? 'flex' : 'none' ?>;flex-direction:column;flex:1;overflow:hidden;">
+    <!-- board toolbar -->
+    <div class="board-toolbar">
+        <span class="board-label"><?= htmlspecialchars($project['name']) ?></span>
+        <div class="board-toolbar-spacer"></div>
 
-        <div class="board-toolbar">
-            <span class="board-label"><?= htmlspecialchars($project['name']) ?></span>
-            <div class="board-toolbar-spacer"></div>
-            <form class="invite-wrap" onsubmit="inviteUser(event, <?= $project['id'] ?>)" style="margin:0;">
-                <input type="email" name="email" placeholder="Email для приглашения" required>
-                <button type="submit" class="topbar-btn primary">Пригласить</button>
-            </form>
-            <div id="invite-msg-<?= $project['id'] ?>" class="invite-msg" style="display:none;"></div>
-            <button class="members-btn" onclick="openMembersModal(<?= $project['id'] ?>)">👥 Участники</button>
-        </div>
+        <form class="invite-wrap" onsubmit="inviteUser(event, <?= $project['id'] ?>)" style="margin:0;">
+            <input type="email" name="email" placeholder="Email для приглашения" required>
+            <button type="submit" class="topbar-btn primary">Пригласить</button>
+        </form>
+        <div id="invite-msg-<?= $project['id'] ?>" class="invite-msg" style="display:none;"></div>
 
-        <div class="board-canvas">
-            <?php foreach ($kanban as $status => $status_tasks): ?>
-            <div class="kanban-col">
-                <div class="col-header">
-                    <span class="col-dot <?= $dots[$status] ?>"></span>
-                    <span class="col-title"><?= $titles[$status] ?></span>
-                    <span class="col-count"><?= count($status_tasks) ?></span>
-                </div>
-                <div class="col-body"
-                     data-status="<?= $status ?>"
-                     data-project-id="<?= $project['id'] ?>">
-                    <?php if (empty($status_tasks)): ?>
-                        <div class="empty-col">—</div>
+        <button class="members-btn" onclick="openMembersModal(<?= $project['id'] ?>)">
+            👥 Участники
+        </button>
+    </div>
+
+    <!-- kanban columns -->
+    <div class="board-canvas">
+        <?php foreach ($kanban as $status => $status_tasks): ?>
+        <div class="kanban-col">
+            <div class="col-header">
+                <span class="col-dot <?= $dots[$status] ?>"></span>
+                <span class="col-title"><?= $titles[$status] ?></span>
+                <span class="col-count"><?= count($status_tasks) ?></span>
+            </div>
+            <div class="col-body"
+                 data-status="<?= $status ?>"
+                 data-project-id="<?= $project['id'] ?>">
+
+                <?php if (empty($status_tasks)): ?>
+                    <div class="empty-col">—</div>
+                <?php endif; ?>
+
+                <?php foreach ($status_tasks as $task): ?>
+                <div class="task-card task-<?= $task['priority'] ?>" data-id="<?= $task['id'] ?>">
+                    <div class="task-id">#<?= $task['id'] ?></div>
+                    <div class="task-title"><?= htmlspecialchars($task['title']) ?></div>
+                    <?php if (!empty($task['description'])): ?>
+                    <div class="task-desc"><?= mb_strimwidth(htmlspecialchars($task['description']), 0, 70, '…') ?></div>
                     <?php endif; ?>
-                    <?php foreach ($status_tasks as $task): ?>
-                    <div class="task-card task-<?= $task['priority'] ?>" data-id="<?= $task['id'] ?>">
-                        <div class="task-id">#<?= $task['id'] ?></div>
-                        <div class="task-title"><?= htmlspecialchars($task['title']) ?></div>
-                        <?php if (!empty($task['description'])): ?>
-                        <div class="task-desc"><?= mb_strimwidth(htmlspecialchars($task['description']), 0, 70, '…') ?></div>
-                        <?php endif; ?>
-                        <div class="task-footer">
-                            <span class="task-deadline">
-                                <?= $task['deadline'] ? date('d.m', strtotime($task['deadline'])) : 'без срока' ?>
-                            </span>
-                            <a href="view_task.php?id=<?= $task['id'] ?>" class="task-open">открыть →</a>
-                        </div>
+                    <div class="task-footer">
+                        <span class="task-deadline">
+                            <?= $task['deadline'] ? date('d.m', strtotime($task['deadline'])) : 'без срока' ?>
+                        </span>
+                        <a href="view_task.php?id=<?= $task['id'] ?>" class="task-open">открыть →</a>
                     </div>
-                    <?php endforeach; ?>
                 </div>
+                <?php endforeach; ?>
             </div>
-            <?php endforeach; ?>
         </div>
+        <?php endforeach; ?>
     </div>
-    <?php endforeach; ?>
-    </div><!-- /board-side -->
-
-    <!-- ACTIVITY SIDEBAR -->
-    <div class="activity-sidebar">
-        <div class="sidebar-section stats">
-            <div class="sidebar-header">📊 Топ исполнителей</div>
-            <div class="sidebar-body" id="stats-feed-content">
-                <span style="color:var(--text-dim);">Загрузка...</span>
-            </div>
-        </div>
-        <div class="sidebar-section activity">
-            <div class="sidebar-header">🕒 Активность проекта</div>
-            <div class="sidebar-body" id="activity-feed-content">
-                <span style="color:var(--text-dim);">Загрузка...</span>
-            </div>
-        </div>
-    </div>
-
-</div><!-- /main-area -->
+</div>
+<?php endforeach; ?>
 
 <?php endif; ?>
 
 <!-- TOAST -->
 <div class="toast-container position-fixed bottom-0 end-0 p-3">
-    <div id="saveToast" class="toast align-items-center text-white border-0"
-         style="background:#1a1f2e;" role="alert" aria-atomic="true">
+    <div id="saveToast" class="toast align-items-center text-white border-0" style="background:#1a1f2e;" role="alert" aria-atomic="true">
         <div class="d-flex">
             <div class="toast-body" id="toastMessage">Статус обновлён</div>
             <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
@@ -562,7 +492,7 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body" id="membersModalBody">
-                <div style="text-align:center;color:var(--text-dim);font-size:12px;">Загрузка...</div>
+                <div class="text-center" style="color:var(--text-dim);font-size:12px;">Загрузка...</div>
             </div>
         </div>
     </div>
@@ -577,7 +507,6 @@ function switchProject(projectId, tabEl) {
     document.querySelectorAll('.project-board').forEach(b => b.style.display = 'none');
     const board = document.getElementById('board-' + projectId);
     if (board) board.style.display = 'flex';
-    updateSidebar(projectId);
 }
 
 // ── DRAG & DROP ──
@@ -593,9 +522,9 @@ document.addEventListener('DOMContentLoaded', function () {
             ghostClass: 'sortable-ghost',
             onEnd: function (evt) {
                 if (evt.from === evt.to) return;
-                const taskId    = evt.item.getAttribute('data-id');
+                const taskId   = evt.item.getAttribute('data-id');
                 const newStatus = evt.to.getAttribute('data-status');
-                const card      = evt.item;
+                const card     = evt.item;
                 card.classList.add('task-updating');
                 const fd = new FormData();
                 fd.append('id', taskId);
@@ -604,55 +533,31 @@ document.addEventListener('DOMContentLoaded', function () {
                     .then(r => r.json())
                     .then(data => {
                         card.classList.remove('task-updating');
-                        toastMsg.innerText       = data.success ? 'Статус обновлён' : 'Ошибка доступа';
-                        toastEl.style.background = data.success ? '#1a1f2e' : '#c0392b';
+                        toastMsg.innerText = data.success ? 'Статус обновлён' : 'Ошибка доступа';
+                        toastEl.className = 'toast align-items-center text-white border-0 ' + (data.success ? 'bg-dark' : 'bg-danger');
                         if (!data.success) location.reload();
                         toast.show();
                     })
                     .catch(() => {
                         card.classList.remove('task-updating');
-                        toastMsg.innerText       = 'Связь потеряна';
-                        toastEl.style.background = '#c0392b';
+                        toastMsg.innerText = 'Связь потеряна';
+                        toastEl.className = 'toast align-items-center text-white border-0 bg-danger';
                         toast.show();
                     });
             }
         });
     });
-
-    // первый запуск сайдбара
-    setTimeout(() => {
-        const active = document.querySelector('.project-board[style*="flex"]');
-        if (active) updateSidebar(active.id.replace('board-', ''));
-    }, 800);
 });
-
-// ── SIDEBAR ──
-async function updateSidebar(projectId) {
-    try {
-        const [resActivity, resStats] = await Promise.all([
-            fetch('get_activity.php?project_id='   + projectId),
-            fetch('get_statistics.php?project_id=' + projectId)
-        ]);
-        if (resActivity.ok) document.getElementById('activity-feed-content').innerHTML = await resActivity.text();
-        if (resStats.ok)    document.getElementById('stats-feed-content').innerHTML    = await resStats.text();
-    } catch (e) {
-        console.warn('Sidebar update failed:', e);
-    }
-}
-setInterval(() => {
-    const active = document.querySelector('.project-board[style*="flex"]');
-    if (active) updateSidebar(active.id.replace('board-', ''));
-}, 10000);
 
 // ── INVITE ──
 async function inviteUser(event, projectId) {
     event.preventDefault();
-    const form   = event.target;
-    const fd     = new FormData(form);
+    const form = event.target;
+    const fd   = new FormData(form);
     fd.append('project_id', projectId);
-    const msgDiv = document.getElementById('invite-msg-' + projectId);
-    const btn    = form.querySelector('button[type="submit"]');
-    btn.disabled = true;
+    const msgDiv   = document.getElementById('invite-msg-' + projectId);
+    const btn      = form.querySelector('button[type="submit"]');
+    btn.disabled   = true;
     msgDiv.style.display = 'none';
     try {
         const r    = await fetch('invite_user.php', { method: 'POST', body: fd });
@@ -681,36 +586,27 @@ async function openMembersModal(projectId) {
     modalBody.innerHTML = '<div style="text-align:center;color:var(--text-dim);font-size:12px;">Загрузка...</div>';
     modal.show();
     try {
-        const r = await fetch('get_members.php?project_id=' + projectId);
+        const r    = await fetch('get_members.php?project_id=' + projectId);
         modalBody.innerHTML = await r.text();
     } catch {
         modalBody.innerHTML = '<div style="color:var(--red);">Ошибка загрузки.</div>';
     }
 }
-
 async function changeUserRole(projectId, userId, newRole) {
     const fd = new FormData();
-    fd.append('project_id', projectId);
-    fd.append('user_id', userId);
-    fd.append('role', newRole);
+    fd.append('project_id', projectId); fd.append('user_id', userId); fd.append('role', newRole);
     const r    = await fetch('update_role.php', { method: 'POST', body: fd });
     const data = await r.json();
     if (!data.success) { alert('Ошибка: ' + data.error); openMembersModal(projectId); }
 }
-
 async function removeUserFromProject(projectId, userId, email) {
     if (!confirm('Удалить ' + email + ' из проекта?')) return;
     const fd = new FormData();
-    fd.append('project_id', projectId);
-    fd.append('user_id', userId);
+    fd.append('project_id', projectId); fd.append('user_id', userId);
     const r    = await fetch('remove_member.php', { method: 'POST', body: fd });
     const data = await r.json();
     if (data.success) openMembersModal(projectId);
     else alert('Ошибка: ' + data.error);
-}
-function toggleSidebar() {
-    const sidebar = document.querySelector('.activity-sidebar');
-    sidebar.classList.toggle('collapsed');
 }
 </script>
 </body>

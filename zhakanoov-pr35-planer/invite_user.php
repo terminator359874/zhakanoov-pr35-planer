@@ -64,7 +64,7 @@ try {
         <p>Привет! Вас добавили в проект <b>" . htmlspecialchars($project['name']) . "</b>.</p>
         <p>Зайдите в свой личный кабинет, чтобы начать работу.</p>
         <br>
-        <a href='http://zhakanoov-pr35-planer/register.php' style='padding: 10px; background: #007bff; color: white; text-decoration: none;'>Перейти к задачам</a>
+        <a href='http://твой-сайт.ru/login.php' style='padding: 10px; background: #007bff; color: white; text-decoration: none;'>Перейти к задачам</a>
     ";
 
     $mail->send();
