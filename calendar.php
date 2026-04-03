@@ -369,31 +369,100 @@ $user_id = $_SESSION['user_id'];
             list.style.flexDirection = 'column';
             list.style.gap = '8px';
             
+            const priorityMap = {
+                'low': { label: 'Низкий', color: 'var(--green)' },
+                'medium': { label: 'Средний', color: 'var(--yellow)' },
+                'high': { label: 'Высокий', color: 'var(--red)' }
+            };
+
+            const statusMap = {
+                'new': 'Новая',
+                'working': 'В работе',
+                'progress': 'В процессе',
+                'done': 'Завершена'
+            };
+
             tasks.forEach(t => {
                 const item = document.createElement('div');
                 item.style.border = '1px solid var(--border)';
-                item.style.padding = '8px 12px';
-                item.style.borderRadius = '4px';
+                item.style.padding = '10px 14px';
+                item.style.borderRadius = '6px';
+                item.style.display = 'flex';
+                item.style.flexDirection = 'column';
+                item.style.gap = '6px';
                 
+                // Проект и Время
+                let headerContainer = document.createElement('div');
+                headerContainer.style.display = 'flex';
+                headerContainer.style.justifyContent = 'space-between';
+                headerContainer.style.alignItems = 'center';
+
                 let p = document.createElement('div');
                 p.style.fontSize = '10px';
                 p.style.fontFamily = 'monospace';
                 p.style.color = 'var(--text-dim)';
                 p.textContent = t.project_name || 'Без проекта';
 
+                let timeStr = t.deadline ? t.deadline.substring(11, 16) : '';
+                let timeBadge = document.createElement('div');
+                timeBadge.style.fontSize = '10px';
+                timeBadge.style.fontWeight = '600';
+                timeBadge.style.color = 'var(--text-head)';
+                timeBadge.style.background = 'var(--surface2)';
+                timeBadge.style.padding = '2px 6px';
+                timeBadge.style.borderRadius = '4px';
+                timeBadge.innerHTML = '🕒 ' + (timeStr !== '00:00' && timeStr !== '' ? timeStr : 'Весь день');
+
+                headerContainer.appendChild(p);
+                headerContainer.appendChild(timeBadge);
+
+                // Название
                 let title = document.createElement('div');
                 title.style.fontWeight = '600';
-                title.style.fontSize = '13px';
+                title.style.fontSize = '14px';
+                title.style.color = 'var(--text-head)';
                 title.textContent = t.title;
                 
+                // Статус и Приоритет
+                let metaContainer = document.createElement('div');
+                metaContainer.style.display = 'flex';
+                metaContainer.style.gap = '8px';
+                metaContainer.style.alignItems = 'center';
+
+                let prio = priorityMap[t.priority] || { label: t.priority, color: 'var(--text-dim)' };
+                let prioBadge = document.createElement('div');
+                prioBadge.style.fontSize = '10px';
+                prioBadge.style.color = prio.color;
+                prioBadge.style.border = `1px solid ${prio.color}`;
+                prioBadge.style.padding = '1px 5px';
+                prioBadge.style.borderRadius = '3px';
+                prioBadge.textContent = 'Приоритет: ' + prio.label;
+
+                let statBadge = document.createElement('div');
+                statBadge.style.fontSize = '10px';
+                statBadge.style.color = 'var(--text-dim)';
+                statBadge.style.border = '1px solid var(--border)';
+                statBadge.style.padding = '1px 5px';
+                statBadge.style.borderRadius = '3px';
+                statBadge.textContent = 'Статус: ' + (statusMap[t.status] || t.status);
+
+                metaContainer.appendChild(prioBadge);
+                metaContainer.appendChild(statBadge);
+
                 let link = document.createElement('a');
                 link.href = 'view_task.php?id=' + t.id;
                 link.style.fontSize = '12px';
                 link.style.color = 'var(--accent)';
-                link.textContent = 'Открыть задачу';
+                link.style.textDecoration = 'none';
+                link.style.fontWeight = '500';
+                link.style.marginTop = '4px';
+                link.textContent = 'Открыть задачу →';
+                link.onmouseover = () => link.style.textDecoration = 'underline';
+                link.onmouseout = () => link.style.textDecoration = 'none';
 
-                item.appendChild(p);
+                item.appendChild(headerContainer);
                 item.appendChild(title);
+                item.appendChild(metaContainer);
                 item.appendChild(link);
                 
                 list.appendChild(item);
