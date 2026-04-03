@@ -29,15 +29,32 @@ try {
 
     if (!$project) throw new Exception('У вас нет прав или проект не найден.');
 
-    // 2. Логика добавления в базу (оставляем ту же)
+    // 2. Логика добавления в базу: вставляем в project_invitations
+    // Сначала проверим, является ли пользователь уже участником проекта
     $stmt = $db->prepare("SELECT id FROM users WHERE email = ?");
     $stmt->execute([$email]);
     $user = $stmt->fetch();
 
+    $is_registered = false;
     if ($user) {
-        $stmt = $db->prepare("INSERT IGNORE INTO project_members (project_id, user_id) VALUES (?, ?)");
+        $is_registered = true;
+        $stmt = $db->prepare("SELECT id FROM project_members WHERE project_id = ? AND user_id = ?");
         $stmt->execute([$project_id, $user['id']]);
+        if ($stmt->fetch()) {
+            throw new Exception('Пользователь уже состоит в этом проекте.');
+        }
     }
+
+    // Проверяем, есть ли уже активное приглашение
+    $stmt = $db->prepare("SELECT id FROM project_invitations WHERE project_id = ? AND to_email = ? AND status = 'pending'");
+    $stmt->execute([$project_id, $email]);
+    if ($stmt->fetch()) {
+        throw new Exception('Приглашение уже отправлено этому пользователю и ожидает ответа.');
+    }
+
+    // Создаем приглашение
+    $stmt = $db->prepare("INSERT INTO project_invitations (project_id, from_user_id, to_email, status) VALUES (?, ?, ?, 'pending')");
+    $stmt->execute([$project_id, $current_user_id, $email]);
 
     // 3. ОТПРАВКА ПИСЬМА
     $mail = new PHPMailer(true);
@@ -69,11 +86,25 @@ try {
 
     $mail->send();
 
-    echo json_encode(['success' => true, 'message' => 'Приглашение и письмо отправлены!']);
+    if (!$is_registered) {
+        echo json_encode([
+            'success' => true, 
+            'message' => 'Письмо отправлено, но пользователь с таким email ещё не зарегистрирован.',
+            'is_warning' => true
+        ]);
+    } else {
+        echo json_encode([
+            'success' => true, 
+            'message' => 'Приглашение и письмо отправлены!'
+        ]);
+    }
 
 } catch (Exception $e) {
-    // Если ошибка в PHPMailer, она попадет сюда
-    echo json_encode(['success' => false, 'error' => 'Ошибка: ' . $mail->ErrorInfo]);
+    if (isset($mail) && $mail instanceof PHPMailer && !empty($mail->ErrorInfo)) {
+        echo json_encode(['success' => false, 'error' => 'Ошибка почты: ' . $mail->ErrorInfo]);
+    } else {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
 } catch (PDOException $e) {
     echo json_encode(['success' => false, 'error' => 'Ошибка базы данных.']);
 }

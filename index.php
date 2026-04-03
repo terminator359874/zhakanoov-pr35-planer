@@ -21,6 +21,23 @@ $stmt = $db->prepare("
 ");
 $stmt->execute(['user_id' => $user_id]);
 $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+$stmtEmail = $db->prepare("SELECT email FROM users WHERE id = ?");
+$stmtEmail->execute([$user_id]);
+$currentUserEmail = $stmtEmail->fetchColumn();
+
+// Получаем приглашения
+$stmtInv = $db->prepare("
+    SELECT pi.id, p.name as project_name, u.name as from_user_name 
+    FROM project_invitations pi
+    JOIN projects p ON p.id = pi.project_id
+    JOIN users u ON u.id = pi.from_user_id
+    WHERE pi.to_email = :email AND pi.status = 'pending'
+    ORDER BY pi.created_at DESC
+");
+$stmtInv->execute(['email' => $currentUserEmail]);
+$invitations = $stmtInv->fetchAll(PDO::FETCH_ASSOC);
+$invitesCount = count($invitations);
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -430,7 +447,15 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <div class="topbar-sep"></div>
     <a href="create_task.php" class="topbar-btn primary">+ Задача</a>
     <a href="create_project.php" class="topbar-btn">+ Проект</a>
+    <a href="calendar.php" class="topbar-btn" style="color:var(--accent); border-color:var(--accent);">📅 Календарь</a>
     <div class="topbar-spacer"></div>
+    <?php if ($invitesCount > 0): ?>
+    <button class="topbar-btn" style="border-color:var(--yellow); color:var(--yellow);" data-bs-toggle="modal" data-bs-target="#invitesModal">
+        🔔 Приглашения (<?= $invitesCount ?>)
+    </button>
+    <?php else: ?>
+    <button class="topbar-btn" data-bs-toggle="modal" data-bs-target="#invitesModal">🔔 Приглашения (0)</button>
+    <?php endif; ?>
     <button class="topbar-btn" onclick="toggleSidebar()">📊 Активность</button>
     <a href="logout.php" class="topbar-btn danger">Выйти</a>
 </div>
@@ -553,6 +578,38 @@ $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
 </div>
 
+<!-- INVITES MODAL -->
+<div class="modal" id="invitesModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" style="font-size:14px;">Ваши приглашения</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <?php if (count($invitations) === 0): ?>
+                    <div style="text-align:center;color:var(--text-dim);font-size:12px;">У вас нет новых приглашений.</div>
+                <?php else: ?>
+                    <div style="display:flex; flex-direction:column; gap:10px;">
+                    <?php foreach($invitations as $inv): ?>
+                        <div style="border:1px solid var(--border); border-radius:4px; padding:10px; display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <strong><?= htmlspecialchars($inv['project_name']) ?></strong><br>
+                                <span style="font-size:11px; color:var(--text-dim);">От: <?= htmlspecialchars($inv['from_user_name']) ?></span>
+                            </div>
+                            <div style="display:flex; gap:6px;">
+                                <button class="topbar-btn primary" onclick="handleInvite(<?= $inv['id'] ?>, 'accept')">Принять</button>
+                                <button class="topbar-btn danger" onclick="handleInvite(<?= $inv['id'] ?>, 'reject')">Отклонить</button>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- MEMBERS MODAL -->
 <div class="modal" id="membersModal" tabindex="-1">
     <div class="modal-dialog">
@@ -659,7 +716,7 @@ async function inviteUser(event, projectId) {
         const data = await r.json();
         msgDiv.style.display = 'block';
         if (data.success) {
-            msgDiv.style.color = 'var(--green)';
+            msgDiv.style.color = data.is_warning ? 'var(--red)' : 'var(--green)';
             msgDiv.textContent = data.message;
             form.reset();
             setTimeout(() => { msgDiv.style.display = 'none'; }, 4000);
@@ -711,6 +768,28 @@ async function removeUserFromProject(projectId, userId, email) {
 function toggleSidebar() {
     const sidebar = document.querySelector('.activity-sidebar');
     sidebar.classList.toggle('collapsed');
+}
+
+// ── INVITES ──
+async function handleInvite(inviteId, action) {
+    const fd = new FormData();
+    fd.append('invite_id', inviteId);
+    
+    // action == 'accept' => 'accept_invite.php'
+    // action == 'reject' => 'reject_invite.php'
+    const endpoint = action === 'accept' ? 'accept_invite.php' : 'reject_invite.php';
+    
+    try {
+        const r = await fetch(endpoint, { method: 'POST', body: fd });
+        const data = await r.json();
+        if (data.success) {
+            location.reload(); 
+        } else {
+            alert('Ошибка: ' + data.error);
+        }
+    } catch {
+        alert('Ошибка сети.');
+    }
 }
 </script>
 </body>

@@ -1,1 +1,0 @@
-# zhakanoov-pr35-planer
