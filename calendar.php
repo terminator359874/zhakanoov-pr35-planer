@@ -10,7 +10,6 @@ if (!isset($_SESSION['user_id'])) {
 $database = new Database();
 $db = $database->getConnection();
 $user_id = $_SESSION['user_id'];
-
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -34,9 +33,7 @@ $user_id = $_SESSION['user_id'];
             --yellow:    #e8a000;
             --green:     #1e9e52;
         }
-
         * { box-sizing: border-box; margin: 0; padding: 0; }
-
         body {
             background: var(--bg);
             color: var(--text);
@@ -57,6 +54,7 @@ $user_id = $_SESSION['user_id'];
             padding: 0 16px;
             gap: 8px;
             flex-shrink: 0;
+            z-index: 100;
         }
         .topbar-brand {
             font-family: 'JetBrains Mono', monospace;
@@ -87,8 +85,6 @@ $user_id = $_SESSION['user_id'];
         .topbar-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .topbar-btn.primary { border-color: var(--accent); color: var(--accent); }
         .topbar-btn.primary:hover:not(:disabled) { background: rgba(43,107,230,.08); }
-        .topbar-btn.danger { border-color: #f5c6c6; color: var(--red); }
-        .topbar-spacer { flex: 1; }
 
         .main-area {
             flex: 1;
@@ -98,36 +94,42 @@ $user_id = $_SESSION['user_id'];
             justify-content: center;
             align-items: flex-start;
         }
-
         .calendar-wrapper {
             background: var(--surface);
             border: 1px solid var(--border);
             border-radius: 8px;
             padding: 20px;
             width: 100%;
-            max-width: 900px;
+            max-width: 1000px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            min-height: 700px;
         }
-
         .calendar-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
         }
         .calendar-header h2 {
             margin: 0;
             font-size: 18px;
             font-weight: 600;
             color: var(--text-head);
+            min-width: 200px;
+        }
+        .header-controls {
+            display: flex;
+            gap: 10px;
         }
 
+        /* Monthly View */
         .calendar-grid {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
             gap: 8px;
         }
-
         .weekday {
             text-transform: uppercase;
             font-size: 11px;
@@ -136,7 +138,6 @@ $user_id = $_SESSION['user_id'];
             text-align: center;
             padding-bottom: 8px;
         }
-
         .cal-day {
             min-height: 80px;
             border: 1px solid var(--border);
@@ -147,33 +148,12 @@ $user_id = $_SESSION['user_id'];
             background: var(--surface2);
             transition: border-color .15s, background .15s;
         }
-        .cal-day:hover {
-            border-color: #b0b8c8;
-        }
-        .cal-day.empty {
-            background: transparent;
-            border-color: transparent;
-            pointer-events: none;
-        }
-        .cal-day.today {
-            border-color: var(--accent);
-            background: rgba(43,107,230,.04);
-        }
-        .cal-day.has-tasks {
-            cursor: pointer;
-        }
-        .cal-day.has-tasks:hover {
-            background: var(--surface);
-            box-shadow: 0 2px 6px rgba(0,0,0,.05);
-        }
-
-        .day-number {
-            font-weight: 600;
-            font-size: 13px;
-            color: var(--text-head);
-            align-self: flex-end;
-        }
-
+        .cal-day:hover { border-color: #b0b8c8; }
+        .cal-day.empty { background: transparent; border-color: transparent; pointer-events: none; }
+        .cal-day.today { border-color: var(--accent); background: rgba(43,107,230,.04); }
+        .cal-day.has-tasks { cursor: pointer; }
+        .cal-day.has-tasks:hover { background: var(--surface); box-shadow: 0 2px 6px rgba(0,0,0,.05); }
+        .day-number { font-weight: 600; font-size: 13px; color: var(--text-head); align-self: flex-end; }
         .task-badge {
             margin-top: auto;
             background: var(--accent);
@@ -185,10 +165,119 @@ $user_id = $_SESSION['user_id'];
             text-align: center;
             align-self: flex-start;
         }
-        .task-badge.none {
-            background: transparent;
-            color: var(--text-dim);
+        .task-badge.none { background: transparent; color: var(--text-dim); }
+
+        /* Weekly View */
+        .weekly-grid {
+            display: flex;
+            flex-direction: column;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+            flex: 1;
         }
+        .week-header {
+            display: grid;
+            grid-template-columns: 50px repeat(7, 1fr);
+            border-bottom: 1px solid var(--border);
+            background: var(--surface2);
+        }
+        .time-col-header, .week-day-header {
+            padding: 8px;
+            text-align: center;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-dim);
+            border-right: 1px solid var(--border);
+        }
+        .week-day-header:last-child { border-right: none; }
+        .week-day-header.today {
+            color: var(--accent);
+            background: rgba(43,107,230,.08);
+        }
+        .week-body {
+            display: grid;
+            grid-template-columns: 50px repeat(7, 1fr);
+            height: 600px;
+            overflow-y: auto;
+            background: var(--surface);
+        }
+        .time-col {
+            border-right: 1px solid var(--border);
+            background: var(--surface2);
+            position: relative;
+        }
+        .day-col {
+            border-right: 1px solid var(--border);
+            position: relative;
+        }
+        .day-col:last-child { border-right: none; }
+
+        .time-slot {
+            height: 60px;
+            text-align: right;
+            padding: 2px 4px 0 0;
+            color: var(--text-dim);
+            font-size: 10px;
+            box-sizing: border-box;
+        }
+        .all-day-row-label {
+            min-height: 40px;
+            border-bottom: 2px solid var(--text-dim);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: var(--text-dim);
+            background: var(--surface2);
+        }
+        .all-day-slot {
+            min-height: 40px;
+            border-bottom: 2px solid var(--text-dim);
+            background: rgba(43,107,230,.04);
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            padding: 2px;
+            position: relative;
+            z-index: 5;
+        }
+        .hours-slot {
+            position: relative;
+            height: 1440px; 
+            background-size: 100% 60px;
+            background-image: linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+        }
+        .week-task {
+            position: absolute;
+            left: 2px;
+            right: 2px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--accent);
+            border-radius: 4px;
+            padding: 4px;
+            overflow: hidden;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            transition: box-shadow 0.1s;
+            z-index: 10;
+        }
+        .week-task.all-day {
+            position: static;
+            margin-bottom: 2px;
+        }
+        .week-task:hover { box-shadow: 0 3px 8px rgba(0,0,0,0.15); z-index: 20 !important; }
+        .week-task-title {
+            font-size: 10px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: var(--text-head);
+            line-height:1.2;
+        }
+        .week-task-status { font-size: 9px; color: var(--text-dim); line-height:1; margin-top:2px; }
 
     </style>
 </head>
@@ -203,14 +292,19 @@ $user_id = $_SESSION['user_id'];
 <div class="main-area">
     <div class="calendar-wrapper">
         <div class="calendar-header">
-            <h2 id="monthTitle">...</h2>
-            <div>
-                <button id="btnPrev" class="topbar-btn" onclick="changeMonth(-1)">&#8592; Назад</button>
-                <button id="btnNext" class="topbar-btn" onclick="changeMonth(1)">Вперёд &#8594;</button>
+            <h2 id="viewTitle">...</h2>
+            <div class="header-controls">
+                <select id="viewSelect" class="topbar-btn" onchange="setViewMode(this.value)">
+                    <option value="month">Месяц</option>
+                    <option value="week">Неделя</option>
+                </select>
+                <button id="btnPrev" class="topbar-btn" onclick="navStep(-1)">&#8592; Назад</button>
+                <button id="btnNext" class="topbar-btn" onclick="navStep(1)">Вперёд &#8594;</button>
             </div>
         </div>
-        <div class="calendar-grid" id="calendarGrid">
-            <!-- Days of week -->
+
+        <!-- Month View Grid -->
+        <div class="calendar-grid" id="monthGrid">
             <div class="weekday">Пн</div>
             <div class="weekday">Вт</div>
             <div class="weekday">Ср</div>
@@ -218,8 +312,35 @@ $user_id = $_SESSION['user_id'];
             <div class="weekday">Пт</div>
             <div class="weekday">Сб</div>
             <div class="weekday">Вс</div>
-            
-            <!-- JavaScript will inject days here -->
+            <!-- Days injected via JS -->
+        </div>
+
+        <!-- Week View Grid -->
+        <div class="weekly-grid" id="weekGrid" style="display: none;">
+            <div class="week-header">
+                <div class="time-col-header">Время</div>
+                <div class="week-day-header" id="wh-0">Пн</div>
+                <div class="week-day-header" id="wh-1">Вт</div>
+                <div class="week-day-header" id="wh-2">Ср</div>
+                <div class="week-day-header" id="wh-3">Чт</div>
+                <div class="week-day-header" id="wh-4">Пт</div>
+                <div class="week-day-header" id="wh-5">Сб</div>
+                <div class="week-day-header" id="wh-6">Вс</div>
+            </div>
+            <div class="week-body" id="weekBody">
+                <div class="time-col" id="timeCol">
+                    <div class="all-day-row-label">Весь день</div>
+                    <!-- 00:00 - 23:00 -->
+                </div>
+                <!-- 7 days -->
+                <div class="day-col" id="wd-0"><div class="all-day-slot" id="wad-0"></div><div class="hours-slot" id="whs-0"></div></div>
+                <div class="day-col" id="wd-1"><div class="all-day-slot" id="wad-1"></div><div class="hours-slot" id="whs-1"></div></div>
+                <div class="day-col" id="wd-2"><div class="all-day-slot" id="wad-2"></div><div class="hours-slot" id="whs-2"></div></div>
+                <div class="day-col" id="wd-3"><div class="all-day-slot" id="wad-3"></div><div class="hours-slot" id="whs-3"></div></div>
+                <div class="day-col" id="wd-4"><div class="all-day-slot" id="wad-4"></div><div class="hours-slot" id="whs-4"></div></div>
+                <div class="day-col" id="wd-5"><div class="all-day-slot" id="wad-5"></div><div class="hours-slot" id="whs-5"></div></div>
+                <div class="day-col" id="wd-6"><div class="all-day-slot" id="wad-6"></div><div class="hours-slot" id="whs-6"></div></div>
+            </div>
         </div>
     </div>
 </div>
@@ -229,12 +350,10 @@ $user_id = $_SESSION['user_id'];
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="tasksModalTitle" style="font-size:14px;">Задачи на</h5>
+                <h5 class="modal-title" id="tasksModalTitle" style="font-size:14px;">Задачи</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body" id="tasksModalBody">
-                <!-- Tasks will be listed here -->
-            </div>
+            <div class="modal-body" id="tasksModalBody"></div>
         </div>
     </div>
 </div>
@@ -242,85 +361,153 @@ $user_id = $_SESSION['user_id'];
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     const monthsNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+    const shortDays = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
     
     const currentDate = new Date();
+    currentDate.setHours(0,0,0,0);
     const currentYear = currentDate.getFullYear();
     const currentMonth = currentDate.getMonth(); 
+    
+    // Limits
+    const minAllowedDate = new Date(currentYear, currentMonth - 1, 1);
+    const maxAllowedDate = new Date(currentYear, currentMonth + 4, 0); // End of month +3
 
+    let viewMode = 'month';
     let viewYear = currentYear;
     let viewMonth = currentMonth;
+    
+    let viewWeekStart = getMonday(currentDate);
 
-    let monthlyTasksCache = {};
+    let tasksCache = []; // flat list of current frame's tasks
 
-    function updateNavButtons() {
-        const minAllowedDate = new Date(currentYear, currentMonth - 1, 1);
-        const maxAllowedDate = new Date(currentYear, currentMonth + 3, 1);
-        
-        const currentViewDate = new Date(viewYear, viewMonth, 1);
-        
-        document.getElementById('btnPrev').disabled = currentViewDate <= minAllowedDate;
-        document.getElementById('btnNext').disabled = currentViewDate >= maxAllowedDate;
+    function getMonday(d) {
+        d = new Date(d);
+        var day = d.getDay(), diff = d.getDate() - day + (day === 0 ? -6 : 1);
+        return new Date(d.getFullYear(), d.getMonth(), diff);
+    }
+    
+    function formatDateYMD(d) {
+        return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
     }
 
-    async function loadCalendar() {
-        updateNavButtons();
-        document.getElementById('monthTitle').textContent = `${monthsNames[viewMonth]} ${viewYear}`;
-        
-        const grid = document.getElementById('calendarGrid');
-        
-        // Remove old days
-        const days = grid.querySelectorAll('.cal-day');
-        days.forEach(d => d.remove());
+    // Init time column in weekly view
+    const timeCol = document.getElementById('timeCol');
+    for (let i = 0; i <= 23; i++) {
+        let slot = document.createElement('div');
+        slot.className = 'time-slot';
+        slot.textContent = String(i).padStart(2, '0') + ':00';
+        timeCol.appendChild(slot);
+    }
 
-        // We fetch data
-        let tasksData = {};
-        try {
-            const res = await fetch(`get_calendar_tasks.php?year=${viewYear}&month=${viewMonth + 1}`);
-            const data = await res.json();
-            if (data.success) {
-                tasksData = data.tasksByDay;
-                monthlyTasksCache = tasksData; // Save for modal
-            }
-        } catch (e) {
-            console.error('Ошибка загрузки задач');
+    function setViewMode(mode) {
+        viewMode = mode;
+        if (mode === 'month') {
+            document.getElementById('monthGrid').style.display = 'grid';
+            document.getElementById('weekGrid').style.display = 'none';
+        } else {
+            document.getElementById('monthGrid').style.display = 'none';
+            document.getElementById('weekGrid').style.display = 'flex';
+        }
+        loadData();
+    }
+
+    function navStep(delta) {
+        if (viewMode === 'month') {
+            viewMonth += delta;
+            if (viewMonth > 11) { viewMonth = 0; viewYear++; }
+            else if (viewMonth < 0) { viewMonth = 11; viewYear--; }
+        } else {
+            viewWeekStart.setDate(viewWeekStart.getDate() + (delta * 7));
+        }
+        loadData();
+    }
+
+    function updateNavButtons() {
+        if (viewMode === 'month') {
+            const currentViewDate = new Date(viewYear, viewMonth, 1);
+            document.getElementById('btnPrev').disabled = currentViewDate <= minAllowedDate;
+            document.getElementById('btnNext').disabled = currentViewDate >= maxAllowedDate;
+            document.getElementById('viewTitle').textContent = `${monthsNames[viewMonth]} ${viewYear}`;
+        } else { // week
+            // roughly check week bounds
+            let viewWeekEnd = new Date(viewWeekStart);
+            viewWeekEnd.setDate(viewWeekEnd.getDate() + 6);
+            
+            document.getElementById('btnPrev').disabled = viewWeekEnd < minAllowedDate;
+            document.getElementById('btnNext').disabled = viewWeekStart > maxAllowedDate;
+
+            let titleStr = `${viewWeekStart.getDate()} ${monthsNames[viewWeekStart.getMonth()].substring(0,3)} — ${viewWeekEnd.getDate()} ${monthsNames[viewWeekEnd.getMonth()].substring(0,3)} ${viewWeekEnd.getFullYear()}`;
+            document.getElementById('viewTitle').textContent = titleStr;
+        }
+    }
+
+    async function loadData() {
+        updateNavButtons();
+        
+        let startDateStr = '';
+        let endDateStr = '';
+
+        if (viewMode === 'month') {
+            let start = new Date(viewYear, viewMonth, 1);
+            let end = new Date(viewYear, viewMonth + 1, 0);
+            startDateStr = formatDateYMD(start);
+            endDateStr = formatDateYMD(end);
+        } else {
+            let end = new Date(viewWeekStart);
+            end.setDate(end.getDate() + 6);
+            startDateStr = formatDateYMD(viewWeekStart);
+            endDateStr = formatDateYMD(end);
         }
 
-        // Calculate calendar layout
+        try {
+            const res = await fetch(`get_tasks_by_range.php?start_date=${startDateStr}&end_date=${endDateStr}`);
+            const data = await res.json();
+            if (data.success) {
+                let flatTasks = [];
+                for (const date in data.tasksByDay) {
+                    flatTasks.push(...data.tasksByDay[date]);
+                }
+                tasksCache = flatTasks;
+                
+                if (viewMode === 'month') renderMonth(data.tasksByDay);
+                else renderWeek(flatTasks);
+            }
+        } catch (e) {
+            console.error('Ошибка загрузки задач', e);
+        }
+    }
+
+    function renderMonth(tasksByDay) {
+        const grid = document.getElementById('monthGrid');
+        grid.querySelectorAll('.cal-day').forEach(d => d.remove());
+
         const firstDayOfMonth = new Date(viewYear, viewMonth, 1);
         const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
         
-        // getDay() is 0 (Sun) to 6 (Sat). We want Monday=0
         let firstDayPos = firstDayOfMonth.getDay() - 1;
-        if (firstDayPos === -1) firstDayPos = 6; // Sunday
+        if (firstDayPos === -1) firstDayPos = 6; 
 
-        // Fill empty boxes before first day
         for (let i = 0; i < firstDayPos; i++) {
             const emptyCell = document.createElement('div');
             emptyCell.className = 'cal-day empty';
             grid.appendChild(emptyCell);
         }
 
-        // Create actual days
         for (let day = 1; day <= daysInMonth; day++) {
             const cell = document.createElement('div');
             cell.className = 'cal-day';
             
-            // Check if today
             if (viewYear === currentYear && viewMonth === currentMonth && day === currentDate.getDate()) {
                 cell.classList.add('today');
             }
 
-            const yyyy = viewYear;
-            const mm = String(viewMonth + 1).padStart(2, '0');
-            const dd = String(day).padStart(2, '0');
-            const dateStr = `${yyyy}-${mm}-${dd}`;
-
-            const tasksForDay = tasksData[dateStr] || [];
+            const dateStr = formatDateYMD(new Date(viewYear, viewMonth, day));
+            const tasksForDay = tasksByDay[dateStr] || [];
             const taskCount = tasksForDay.length;
 
             if (taskCount > 0) {
                 cell.classList.add('has-tasks');
-                cell.onclick = () => openModal(dateStr, day, monthsNames[viewMonth]);
+                cell.onclick = () => openModal(tasksForDay, `${day} ${monthsNames[viewMonth]}`);
             }
 
             const numDiv = document.createElement('div');
@@ -337,162 +524,200 @@ $user_id = $_SESSION['user_id'];
                 badgeDiv.textContent = '0 задач';
             }
             cell.appendChild(badgeDiv);
-
             grid.appendChild(cell);
         }
     }
 
-    function changeMonth(delta) {
-        viewMonth += delta;
-        if (viewMonth > 11) {
-            viewMonth = 0;
-            viewYear++;
-        } else if (viewMonth < 0) {
-            viewMonth = 11;
-            viewYear--;
+    function renderWeek(allTasks) {
+        // clear old 
+        for (let i = 0; i < 7; i++) {
+            document.getElementById(`wad-${i}`).innerHTML = '';
+            document.getElementById(`whs-${i}`).innerHTML = '';
         }
-        loadCalendar();
+
+        // populate dates in headers
+        for (let i = 0; i < 7; i++) {
+            let targetD = new Date(viewWeekStart);
+            targetD.setDate(targetD.getDate() + i);
+            
+            let headEl = document.getElementById(`wh-${i}`);
+            let dayName = shortDays[targetD.getDay()];
+            headEl.textContent = `${targetD.getDate()} ${dayName}`;
+            
+            if (targetD.getTime() === currentDate.getTime()) headEl.classList.add('today');
+            else headEl.classList.remove('today');
+        }
+
+        const statusMap = {'new':'Новая','working':'В работе','progress':'В процессе','done':'Завершена'};
+        const prioMap = {'low':'var(--green)','medium':'var(--yellow)','high':'var(--red)'};
+
+        allTasks.forEach(t => {
+            let tDate = new Date(t.deadline.replace(' ', 'T'));
+            let timeStr = t.deadline.substring(11, 16);
+            let isAllDay = (timeStr === '00:00' || timeStr === '');
+            
+            tDate.setHours(0,0,0,0);
+            let diffDays = Math.round((tDate - viewWeekStart) / (1000 * 60 * 60 * 24));
+            if (diffDays >= 0 && diffDays < 7) {
+                
+                let taskDiv = document.createElement('div');
+                taskDiv.className = isAllDay ? 'week-task all-day' : 'week-task';
+                
+                let titleDiv = document.createElement('div');
+                titleDiv.className = 'week-task-title';
+                titleDiv.textContent = t.title;
+
+                let statDiv = document.createElement('div');
+                statDiv.className = 'week-task-status';
+                statDiv.textContent = (isAllDay ? '' : timeStr + ' ') + (statusMap[t.status]||t.status);
+
+                taskDiv.appendChild(titleDiv);
+                taskDiv.appendChild(statDiv);
+                
+                taskDiv.style.borderLeftColor = prioMap[t.priority] || 'var(--accent)';
+                taskDiv.onclick = () => openModal([t], `деталях`);
+
+                if (isAllDay) {
+                    document.getElementById(`wad-${diffDays}`).appendChild(taskDiv);
+                } else {
+                    let originDate = new Date(t.deadline.replace(' ', 'T'));
+                    let h = originDate.getHours();
+                    let m = originDate.getMinutes();
+                    let topPx = (h * 60) + m;
+                    
+                    taskDiv.style.top = topPx + 'px';
+                    taskDiv.style.height = '40px'; 
+                    
+                    document.getElementById(`whs-${diffDays}`).appendChild(taskDiv);
+                }
+            }
+        });
+
+        // Simple cascading for overlapping hours tasks
+        for (let i = 0; i < 7; i++) {
+            let container = document.getElementById(`whs-${i}`);
+            let tasks = Array.from(container.children);
+            tasks.sort((a,b) => parseInt(a.style.top) - parseInt(b.style.top));
+            
+            for (let j = 0; j < tasks.length; j++) {
+                let overlapCount = 0;
+                for (let k = 0; k < j; k++) {
+                    let aTop = parseInt(tasks[k].style.top);
+                    let bTop = parseInt(tasks[j].style.top);
+                    if (bTop < aTop + 40) overlapCount++; // height is 40
+                }
+                if (overlapCount > 0) {
+                    // indent
+                    let maxIndex = Math.min(overlapCount, 3);
+                    tasks[j].style.left = (2 + maxIndex * 10) + 'px';
+                }
+            }
+        }
     }
 
-    function openModal(dateStr, day, monthName) {
-        const tasks = monthlyTasksCache[dateStr] || [];
-        document.getElementById('tasksModalTitle').textContent = `Задачи на ${day} ${monthName}`;
-        
+    function openModal(tasks, scopeName) {
+        document.getElementById('tasksModalTitle').textContent = `Задачи (${scopeName})`;
         const body = document.getElementById('tasksModalBody');
         body.innerHTML = '';
         
-        if (tasks.length === 0) {
-            body.innerHTML = '<div style="color:var(--text-dim);text-align:center;">Нет задач</div>';
-        } else {
-            const list = document.createElement('div');
-            list.style.display = 'flex';
-            list.style.flexDirection = 'column';
-            list.style.gap = '8px';
-            
-            const priorityMap = {
-                'low': { label: 'Низкий', color: 'var(--green)' },
-                'medium': { label: 'Средний', color: 'var(--yellow)' },
-                'high': { label: 'Высокий', color: 'var(--red)' }
-            };
+        const priorityMap = {'low': {label:'Низкий', color:'var(--green)'},'medium': {label:'Средний', color:'var(--yellow)'},'high': {label:'Высокий', color:'var(--red)'}};
+        const statusMap = {'new':'Новая','working':'В работе','progress':'В процессе','done':'Завершена'};
 
-            const statusMap = {
-                'new': 'Новая',
-                'working': 'В работе',
-                'progress': 'В процессе',
-                'done': 'Завершена'
-            };
-
-            tasks.forEach(t => {
-                const item = document.createElement('div');
-                item.style.border = '1px solid var(--border)';
-                item.style.padding = '10px 14px';
-                item.style.borderRadius = '6px';
-                item.style.display = 'flex';
-                item.style.flexDirection = 'column';
-                item.style.gap = '6px';
-                
-                // Проект и Время
-                let headerContainer = document.createElement('div');
-                headerContainer.style.display = 'flex';
-                headerContainer.style.justifyContent = 'space-between';
-                headerContainer.style.alignItems = 'center';
-
-                let p = document.createElement('div');
-                p.style.fontSize = '10px';
-                p.style.fontFamily = 'monospace';
-                p.style.color = 'var(--text-dim)';
-                p.textContent = t.project_name || 'Без проекта';
-
-                let timeStr = t.deadline ? t.deadline.substring(11, 16) : '';
-                let timeBadge = document.createElement('div');
-                timeBadge.style.fontSize = '10px';
-                timeBadge.style.fontWeight = '600';
-                timeBadge.style.color = 'var(--text-head)';
-                timeBadge.style.background = 'var(--surface2)';
-                timeBadge.style.padding = '2px 6px';
-                timeBadge.style.borderRadius = '4px';
-                timeBadge.innerHTML = '🕒 ' + (timeStr !== '00:00' && timeStr !== '' ? timeStr : 'Весь день');
-
-                headerContainer.appendChild(p);
-                headerContainer.appendChild(timeBadge);
-
-                // Название
-                let title = document.createElement('div');
-                title.style.fontWeight = '600';
-                title.style.fontSize = '14px';
-                title.style.color = 'var(--text-head)';
-                title.textContent = t.title;
-                
-                // Статус и Приоритет
-                let metaContainer = document.createElement('div');
-                metaContainer.style.display = 'flex';
-                metaContainer.style.gap = '8px';
-                metaContainer.style.alignItems = 'center';
-
-                let prio = priorityMap[t.priority] || { label: t.priority, color: 'var(--text-dim)' };
-                let prioBadge = document.createElement('div');
-                prioBadge.style.fontSize = '10px';
-                prioBadge.style.color = prio.color;
-                prioBadge.style.border = `1px solid ${prio.color}`;
-                prioBadge.style.padding = '1px 5px';
-                prioBadge.style.borderRadius = '3px';
-                prioBadge.textContent = 'Приоритет: ' + prio.label;
-
-                let statBadge = document.createElement('div');
-                statBadge.style.fontSize = '10px';
-                statBadge.style.color = 'var(--text-dim)';
-                statBadge.style.border = '1px solid var(--border)';
-                statBadge.style.padding = '1px 5px';
-                statBadge.style.borderRadius = '3px';
-                statBadge.textContent = 'Статус: ' + (statusMap[t.status] || t.status);
-
-                metaContainer.appendChild(prioBadge);
-                metaContainer.appendChild(statBadge);
-
-                let link = document.createElement('a');
-                link.href = 'view_task.php?id=' + t.id;
-                link.style.fontSize = '12px';
-                link.style.color = 'var(--accent)';
-                link.style.textDecoration = 'none';
-                link.style.fontWeight = '500';
-                link.style.marginTop = '4px';
-                link.textContent = 'Открыть задачу →';
-                link.onmouseover = () => link.style.textDecoration = 'underline';
-                link.onmouseout = () => link.style.textDecoration = 'none';
-
-                item.appendChild(headerContainer);
-                item.appendChild(title);
-                item.appendChild(metaContainer);
-                item.appendChild(link);
-                
-                list.appendChild(item);
-            });
-            body.appendChild(list);
-        }
+        const list = document.createElement('div');
+        list.style.display = 'flex';
+        list.style.flexDirection = 'column';
+        list.style.gap = '8px';
         
-        const m = new bootstrap.Modal(document.getElementById('tasksModal'));
-        m.show();
+        tasks.forEach(t => {
+            const item = document.createElement('div');
+            item.style.border = '1px solid var(--border)';
+            item.style.padding = '10px 14px';
+            item.style.borderRadius = '6px';
+            item.style.display = 'flex';
+            item.style.flexDirection = 'column';
+            item.style.gap = '6px';
+
+            let headerContainer = document.createElement('div');
+            headerContainer.style.display = 'flex';
+            headerContainer.style.justifyContent = 'space-between';
+            headerContainer.style.alignItems = 'center';
+
+            let p = document.createElement('div');
+            p.style.fontSize = '10px';
+            p.style.fontFamily = 'monospace';
+            p.style.color = 'var(--text-dim)';
+            p.textContent = t.project_name || 'Без проекта';
+
+            let timeStr = t.deadline ? t.deadline.substring(11, 16) : '';
+            let timeBadge = document.createElement('div');
+            timeBadge.style.fontSize = '10px';
+            timeBadge.style.fontWeight = '600';
+            timeBadge.style.color = 'var(--text-head)';
+            timeBadge.style.background = 'var(--surface2)';
+            timeBadge.style.padding = '2px 6px';
+            timeBadge.style.borderRadius = '4px';
+            timeBadge.innerHTML = '🕒 ' + (timeStr !== '00:00' && timeStr !== '' ? timeStr : 'Весь день');
+
+            headerContainer.appendChild(p);
+            headerContainer.appendChild(timeBadge);
+
+            let title = document.createElement('div');
+            title.style.fontWeight = '600';
+            title.style.fontSize = '14px';
+            title.style.color = 'var(--text-head)';
+            title.textContent = t.title;
+
+            let metaContainer = document.createElement('div');
+            metaContainer.style.display = 'flex';
+            metaContainer.style.gap = '8px';
+            metaContainer.style.alignItems = 'center';
+
+            let prio = priorityMap[t.priority] || { label: t.priority, color: 'var(--text-dim)' };
+            let prioBadge = document.createElement('div');
+            prioBadge.style.fontSize = '10px';
+            prioBadge.style.color = prio.color;
+            prioBadge.style.border = `1px solid ${prio.color}`;
+            prioBadge.style.padding = '1px 5px';
+            prioBadge.style.borderRadius = '3px';
+            prioBadge.textContent = 'Приоритет: ' + prio.label;
+
+            let statBadge = document.createElement('div');
+            statBadge.style.fontSize = '10px';
+            statBadge.style.color = 'var(--text-dim)';
+            statBadge.style.border = '1px solid var(--border)';
+            statBadge.style.padding = '1px 5px';
+            statBadge.style.borderRadius = '3px';
+            statBadge.textContent = 'Статус: ' + (statusMap[t.status] || t.status);
+
+            metaContainer.appendChild(prioBadge);
+            metaContainer.appendChild(statBadge);
+
+            let link = document.createElement('a');
+            link.href = 'view_task.php?id=' + t.id;
+            link.style.fontSize = '12px';
+            link.style.color = 'var(--accent)';
+            link.style.textDecoration = 'none';
+            link.style.fontWeight = '500';
+            link.style.marginTop = '4px';
+            link.textContent = 'Открыть задачу →';
+
+            item.appendChild(headerContainer);
+            item.appendChild(title);
+            item.appendChild(metaContainer);
+            item.appendChild(link);
+            list.appendChild(item);
+        });
+        body.appendChild(list);
+        
+        new bootstrap.Modal(document.getElementById('tasksModal')).show();
     }
 
-    // Helper for russian plurals
-    function getPlural(number, one, two, five) {
-        let n = Math.abs(number);
-        n %= 100;
-        if (n >= 5 && n <= 20) {
-            return five;
-        }
-        n %= 10;
-        if (n === 1) {
-            return one;
-        }
-        if (n >= 2 && n <= 4) {
-            return two;
-        }
-        return five;
+    function getPlural(n, one, two, five) {
+        n %= 100; if (n>=5&&n<=20) return five; n %= 10;
+        if (n===1) return one; if (n>=2&&n<=4) return two; return five;
     }
 
-    // Init
-    document.addEventListener('DOMContentLoaded', loadCalendar);
+    document.addEventListener('DOMContentLoaded', loadData);
 </script>
 </body>
 </html>
