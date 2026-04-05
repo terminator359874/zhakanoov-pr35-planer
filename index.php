@@ -792,5 +792,19 @@ async function handleInvite(inviteId, action) {
     }
 }
 </script>
+
+<!-- Фоновая музыка -->
+<audio id="bgMusic" src="musik.mp3" loop preload="auto"></audio>
+<script>
+// Запускаем музыку при первом клике в любой части страницы
+document.addEventListener('click', function initAudio() {
+    const bgMusic = document.getElementById('bgMusic');
+    if (bgMusic && bgMusic.paused) {
+        bgMusic.volume = 0.3; // Громкость 30% для комфортного фона
+        bgMusic.play().catch(e => console.log("Браузер заблокировал автовоспроизведение", e));
+    }
+}, { once: true });
+</script>
+
 </body>
 </html>

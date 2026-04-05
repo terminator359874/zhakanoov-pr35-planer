@@ -17,7 +17,7 @@ try {
     $db = (new Database())->getConnection();
 
     $sql = "
-        SELECT t.id, t.title, t.priority, t.status, t.deadline, p.name as project_name
+        SELECT t.id, t.title, t.description, t.priority, t.status, t.deadline, p.name as project_name
         FROM tasks t
         JOIN projects p ON t.project_id = p.id
         LEFT JOIN project_members pm ON p.id = pm.project_id

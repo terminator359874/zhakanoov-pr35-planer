@@ -279,6 +279,85 @@ $user_id = $_SESSION['user_id'];
         }
         .week-task-status { font-size: 9px; color: var(--text-dim); line-height:1; margin-top:2px; }
 
+        /* Day View */
+        .day-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            flex: 1;
+        }
+        .day-empty-state {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-dim);
+            font-size: 14px;
+            background: var(--surface2);
+            border-radius: 8px;
+            border: 1px dashed var(--border);
+        }
+        .day-task-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+            border-left: 4px solid var(--accent);
+            cursor: pointer;
+            transition: box-shadow 0.15s, transform 0.15s;
+        }
+        .day-task-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            transform: translateY(-1px);
+        }
+        .day-task-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .day-task-time {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-head);
+            background: var(--surface2);
+            padding: 2px 8px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .day-task-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-head);
+            margin-top: 4px;
+        }
+        .day-task-desc {
+            font-size: 13px;
+            color: var(--text-dim);
+            line-height: 1.5;
+            white-space: pre-wrap;
+            margin-top: 4px;
+        }
+        .day-task-meta {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }
+        .day-badge {
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            border: 1px solid var(--border);
+        }
+
     </style>
 </head>
 <body>
@@ -297,7 +376,9 @@ $user_id = $_SESSION['user_id'];
                 <select id="viewSelect" class="topbar-btn" onchange="setViewMode(this.value)">
                     <option value="month">Месяц</option>
                     <option value="week">Неделя</option>
+                    <option value="day">День</option>
                 </select>
+                <button id="btnToday" class="topbar-btn" onclick="navToday()">Сегодня</button>
                 <button id="btnPrev" class="topbar-btn" onclick="navStep(-1)">&#8592; Назад</button>
                 <button id="btnNext" class="topbar-btn" onclick="navStep(1)">Вперёд &#8594;</button>
             </div>
@@ -313,6 +394,11 @@ $user_id = $_SESSION['user_id'];
             <div class="weekday">Сб</div>
             <div class="weekday">Вс</div>
             <!-- Days injected via JS -->
+        </div>
+
+        <!-- Day View Grid -->
+        <div class="day-grid" id="dayGrid" style="display: none;">
+            <!-- Rendered via JS -->
         </div>
 
         <!-- Week View Grid -->
@@ -377,6 +463,7 @@ $user_id = $_SESSION['user_id'];
     let viewMonth = currentMonth;
     
     let viewWeekStart = getMonday(currentDate);
+    let viewDayDate = new Date(currentDate);
 
     let tasksCache = []; // flat list of current frame's tasks
 
@@ -401,13 +488,17 @@ $user_id = $_SESSION['user_id'];
 
     function setViewMode(mode) {
         viewMode = mode;
-        if (mode === 'month') {
-            document.getElementById('monthGrid').style.display = 'grid';
-            document.getElementById('weekGrid').style.display = 'none';
-        } else {
-            document.getElementById('monthGrid').style.display = 'none';
-            document.getElementById('weekGrid').style.display = 'flex';
-        }
+        document.getElementById('monthGrid').style.display = (mode === 'month') ? 'grid' : 'none';
+        document.getElementById('weekGrid').style.display = (mode === 'week') ? 'flex' : 'none';
+        document.getElementById('dayGrid').style.display = (mode === 'day') ? 'flex' : 'none';
+        loadData();
+    }
+
+    function navToday() {
+        viewYear = currentYear;
+        viewMonth = currentMonth;
+        viewWeekStart = getMonday(currentDate);
+        viewDayDate = new Date(currentDate);
         loadData();
     }
 
@@ -416,8 +507,10 @@ $user_id = $_SESSION['user_id'];
             viewMonth += delta;
             if (viewMonth > 11) { viewMonth = 0; viewYear++; }
             else if (viewMonth < 0) { viewMonth = 11; viewYear--; }
-        } else {
+        } else if (viewMode === 'week') {
             viewWeekStart.setDate(viewWeekStart.getDate() + (delta * 7));
+        } else {
+            viewDayDate.setDate(viewDayDate.getDate() + delta);
         }
         loadData();
     }
@@ -428,7 +521,7 @@ $user_id = $_SESSION['user_id'];
             document.getElementById('btnPrev').disabled = currentViewDate <= minAllowedDate;
             document.getElementById('btnNext').disabled = currentViewDate >= maxAllowedDate;
             document.getElementById('viewTitle').textContent = `${monthsNames[viewMonth]} ${viewYear}`;
-        } else { // week
+        } else if (viewMode === 'week') {
             // roughly check week bounds
             let viewWeekEnd = new Date(viewWeekStart);
             viewWeekEnd.setDate(viewWeekEnd.getDate() + 6);
@@ -438,6 +531,11 @@ $user_id = $_SESSION['user_id'];
 
             let titleStr = `${viewWeekStart.getDate()} ${monthsNames[viewWeekStart.getMonth()].substring(0,3)} — ${viewWeekEnd.getDate()} ${monthsNames[viewWeekEnd.getMonth()].substring(0,3)} ${viewWeekEnd.getFullYear()}`;
             document.getElementById('viewTitle').textContent = titleStr;
+        } else if (viewMode === 'day') {
+            document.getElementById('btnPrev').disabled = viewDayDate <= minAllowedDate;
+            document.getElementById('btnNext').disabled = viewDayDate >= maxAllowedDate;
+            let dayName = shortDays[viewDayDate.getDay()];
+            document.getElementById('viewTitle').textContent = `${viewDayDate.getDate()} ${monthsNames[viewDayDate.getMonth()]} ${viewDayDate.getFullYear()}, ${dayName}`;
         }
     }
 
@@ -452,11 +550,14 @@ $user_id = $_SESSION['user_id'];
             let end = new Date(viewYear, viewMonth + 1, 0);
             startDateStr = formatDateYMD(start);
             endDateStr = formatDateYMD(end);
-        } else {
+        } else if (viewMode === 'week') {
             let end = new Date(viewWeekStart);
             end.setDate(end.getDate() + 6);
             startDateStr = formatDateYMD(viewWeekStart);
             endDateStr = formatDateYMD(end);
+        } else {
+            startDateStr = formatDateYMD(viewDayDate);
+            endDateStr = formatDateYMD(viewDayDate);
         }
 
         try {
@@ -470,7 +571,8 @@ $user_id = $_SESSION['user_id'];
                 tasksCache = flatTasks;
                 
                 if (viewMode === 'month') renderMonth(data.tasksByDay);
-                else renderWeek(flatTasks);
+                else if (viewMode === 'week') renderWeek(flatTasks);
+                else renderDay(flatTasks);
             }
         } catch (e) {
             console.error('Ошибка загрузки задач', e);
@@ -613,6 +715,88 @@ $user_id = $_SESSION['user_id'];
                 }
             }
         }
+    }
+
+    function renderDay(dayTasks) {
+        const grid = document.getElementById('dayGrid');
+        grid.innerHTML = '';
+        
+        if (!dayTasks || dayTasks.length === 0) {
+            grid.innerHTML = '<div class="day-empty-state">Нет задач на выбранный день</div>';
+            return;
+        }
+
+        // Sort by time
+        dayTasks.sort((a,b) => {
+            let tA = a.deadline.substring(11, 16);
+            let tB = b.deadline.substring(11, 16);
+            return tA.localeCompare(tB);
+        });
+
+        const statusMap = {'new':'Новая','working':'В работе','progress':'В процессе','done':'Завершена'};
+        const prioMap = {'low': {label:'Низкий', color:'var(--green)'},'medium': {label:'Средний', color:'var(--yellow)'},'high': {label:'Высокий', color:'var(--red)'}};
+
+        dayTasks.forEach(t => {
+            let timeStr = t.deadline ? t.deadline.substring(11, 16) : '';
+            if (timeStr === '00:00' || timeStr === '') timeStr = 'Весь день';
+            
+            const card = document.createElement('div');
+            card.className = 'day-task-card';
+            
+            let prio = prioMap[t.priority] || { label: t.priority, color: 'var(--accent)' };
+            card.style.borderLeftColor = prio.color;
+
+            let header = document.createElement('div');
+            header.className = 'day-task-header';
+            
+            let timeBadge = document.createElement('div');
+            timeBadge.className = 'day-task-time';
+            timeBadge.innerHTML = `🕒 ${timeStr}`;
+            
+            let projBadge = document.createElement('div');
+            projBadge.className = 'day-badge badge-project';
+            projBadge.textContent = t.project_name || 'Без проекта';
+
+            header.appendChild(timeBadge);
+            header.appendChild(projBadge);
+            card.appendChild(header);
+
+            let title = document.createElement('div');
+            title.className = 'day-task-title';
+            title.textContent = t.title;
+            card.appendChild(title);
+
+            if (t.description && t.description.trim() !== '') {
+                let desc = document.createElement('div');
+                desc.className = 'day-task-desc';
+                desc.textContent = t.description;
+                card.appendChild(desc);
+            }
+
+            let meta = document.createElement('div');
+            meta.className = 'day-task-meta';
+
+            let pBadge = document.createElement('div');
+            pBadge.className = 'day-badge';
+            pBadge.style.color = prio.color;
+            pBadge.style.borderColor = prio.color;
+            pBadge.style.backgroundColor = 'transparent';
+            pBadge.textContent = 'Приоритет: ' + prio.label;
+
+            let sBadge = document.createElement('div');
+            sBadge.className = 'day-badge';
+            sBadge.style.color = 'var(--text-dim)';
+            sBadge.textContent = 'Статус: ' + (statusMap[t.status] || t.status);
+
+            meta.appendChild(pBadge);
+            meta.appendChild(sBadge);
+            card.appendChild(meta);
+            
+            // Navigate to task on click
+            card.onclick = () => { window.location.href = 'view_task.php?id=' + t.id; };
+            
+            grid.appendChild(card);
+        });
     }
 
     function openModal(tasks, scopeName) {
