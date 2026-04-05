@@ -279,6 +279,42 @@ $user_id = $_SESSION['user_id'];
         }
         .week-task-status { font-size: 9px; color: var(--text-dim); line-height:1; margin-top:2px; }
 
+        .month-task-item {
+            font-size: 10px;
+            font-weight: 500;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-left: 2px solid var(--accent);
+            padding: 2px 4px;
+            border-radius: 3px;
+            margin-top: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            cursor: grab;
+            position: relative;
+            z-index: 10;
+        }
+        .month-task-item:active { cursor: grabbing; }
+        .month-task-item.dragging { opacity: 0.5; }
+        .month-more-badge {
+            font-size: 9px;
+            color: var(--text-dim);
+            text-align: center;
+            margin-top: 2px;
+            font-weight: 600;
+        }
+        .cal-day.drag-over {
+            background: rgba(43,107,230,.15);
+            border-style: dashed;
+        }
+        .day-col.drag-over {
+            background: rgba(43,107,230,.08);
+        }
+        .week-task { cursor: grab !important; }
+        .week-task:active { cursor: grabbing !important; }
+        .week-task.dragging { opacity: 0.5; z-index: 100 !important; }
+
         /* Day View */
         .day-grid {
             display: flex;
@@ -467,6 +503,67 @@ $user_id = $_SESSION['user_id'];
 
     let tasksCache = []; // flat list of current frame's tasks
 
+    let draggedTaskId = null;
+
+    function handleDragStart(e) {
+        draggedTaskId = e.target.dataset.taskId;
+        // Need to wait until next tick so drag image is normal
+        setTimeout(() => e.target.classList.add('dragging'), 0);
+    }
+
+    function handleDragEnd(e) {
+        e.target.classList.remove('dragging');
+        draggedTaskId = null;
+    }
+
+    function handleDragOver(e) {
+        e.preventDefault(); 
+        const dateStr = e.currentTarget.dataset.date;
+        if (!dateStr) return;
+        const hoverDate = new Date(dateStr);
+        if (hoverDate < minAllowedDate || hoverDate > maxAllowedDate) {
+            e.dataTransfer.dropEffect = 'none';
+            return;
+        }
+        e.dataTransfer.dropEffect = 'move';
+        e.currentTarget.classList.add('drag-over');
+    }
+
+    function handleDragLeave(e) {
+        e.currentTarget.classList.remove('drag-over');
+    }
+
+    async function handleDrop(e) {
+        e.preventDefault();
+        e.currentTarget.classList.remove('drag-over');
+        const taskId = draggedTaskId;
+        const newDate = e.currentTarget.dataset.date;
+        
+        if (!taskId || !newDate) return;
+
+        const hoverDate = new Date(newDate);
+        if (hoverDate < minAllowedDate || hoverDate > maxAllowedDate) {
+            alert('Выход за допустимый диапазон дат');
+            return;
+        }
+
+        try {
+            const res = await fetch('update_task_date.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ task_id: taskId, new_date: newDate })
+            });
+            const data = await res.json();
+            if (data.success) {
+                loadData(); // Re-render silently
+            } else {
+                alert('Ошибка: ' + data.error);
+            }
+        } catch (err) {
+            alert('Ошибка сети при обновлении задачи');
+        }
+    }
+
     function getMonday(d) {
         d = new Date(d);
         var day = d.getDay(), diff = d.getDate() - day + (day === 0 ? -6 : 1);
@@ -599,11 +696,16 @@ $user_id = $_SESSION['user_id'];
             const cell = document.createElement('div');
             cell.className = 'cal-day';
             
+            const dateStr = formatDateYMD(new Date(viewYear, viewMonth, day));
+            cell.dataset.date = dateStr;
+            cell.addEventListener('dragover', handleDragOver);
+            cell.addEventListener('dragleave', handleDragLeave);
+            cell.addEventListener('drop', handleDrop);
+
             if (viewYear === currentYear && viewMonth === currentMonth && day === currentDate.getDate()) {
                 cell.classList.add('today');
             }
 
-            const dateStr = formatDateYMD(new Date(viewYear, viewMonth, day));
             const tasksForDay = tasksByDay[dateStr] || [];
             const taskCount = tasksForDay.length;
 
@@ -617,15 +719,31 @@ $user_id = $_SESSION['user_id'];
             numDiv.textContent = day;
             cell.appendChild(numDiv);
 
-            const badgeDiv = document.createElement('div');
-            if (taskCount > 0) {
-                badgeDiv.className = 'task-badge';
-                badgeDiv.textContent = `${taskCount} ${getPlural(taskCount, 'задача', 'задачи', 'задач')}`;
-            } else {
-                badgeDiv.className = 'task-badge none';
-                badgeDiv.textContent = '0 задач';
+            let maxTasks = 3;
+            for (let k = 0; k < Math.min(taskCount, maxTasks); k++) {
+                let t = tasksForDay[k];
+                let tb = document.createElement('div');
+                tb.className = 'month-task-item';
+                tb.textContent = t.title;
+                tb.draggable = true;
+                tb.dataset.taskId = t.id;
+                
+                // Colorize based on priority like we do in week view
+                const prioMap = {'low':'var(--green)','medium':'var(--yellow)','high':'var(--red)'};
+                tb.style.borderLeftColor = prioMap[t.priority] || 'var(--accent)';
+
+                tb.addEventListener('dragstart', handleDragStart);
+                tb.addEventListener('dragend', handleDragEnd);
+                tb.onclick = (e) => { e.stopPropagation(); window.location.href = 'view_task.php?id=' + t.id; };
+                cell.appendChild(tb);
             }
-            cell.appendChild(badgeDiv);
+            if (taskCount > maxTasks) {
+                let more = document.createElement('div');
+                more.className = 'month-more-badge';
+                more.textContent = `ещё ${taskCount - maxTasks}`;
+                cell.appendChild(more);
+            }
+
             grid.appendChild(cell);
         }
     }
@@ -641,6 +759,7 @@ $user_id = $_SESSION['user_id'];
         for (let i = 0; i < 7; i++) {
             let targetD = new Date(viewWeekStart);
             targetD.setDate(targetD.getDate() + i);
+            let dateStr = formatDateYMD(targetD);
             
             let headEl = document.getElementById(`wh-${i}`);
             let dayName = shortDays[targetD.getDay()];
@@ -648,6 +767,12 @@ $user_id = $_SESSION['user_id'];
             
             if (targetD.getTime() === currentDate.getTime()) headEl.classList.add('today');
             else headEl.classList.remove('today');
+
+            let colEl = document.getElementById(`wd-${i}`);
+            colEl.dataset.date = dateStr;
+            colEl.ondragover = handleDragOver;
+            colEl.ondragleave = handleDragLeave;
+            colEl.ondrop = handleDrop;
         }
 
         const statusMap = {'new':'Новая','working':'В работе','progress':'В процессе','done':'Завершена'};
@@ -678,6 +803,11 @@ $user_id = $_SESSION['user_id'];
                 
                 taskDiv.style.borderLeftColor = prioMap[t.priority] || 'var(--accent)';
                 taskDiv.onclick = () => openModal([t], `деталях`);
+
+                taskDiv.draggable = true;
+                taskDiv.dataset.taskId = t.id;
+                taskDiv.addEventListener('dragstart', handleDragStart);
+                taskDiv.addEventListener('dragend', handleDragEnd);
 
                 if (isAllDay) {
                     document.getElementById(`wad-${diffDays}`).appendChild(taskDiv);
