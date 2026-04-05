@@ -1033,5 +1033,6 @@ $user_id = $_SESSION['user_id'];
 
     document.addEventListener('DOMContentLoaded', loadData);
 </script>
+<script src="notifications.js"></script>
 </body>
 </html>

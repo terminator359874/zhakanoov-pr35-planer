@@ -806,5 +806,6 @@ document.addEventListener('click', function initAudio() {
 }, { once: true });
 </script>
 
+<script src="notifications.js"></script>
 </body>
 </html>

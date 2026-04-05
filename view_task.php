@@ -531,5 +531,6 @@ async function refreshHistory() {
 
 setInterval(refreshHistory, 5000);
 </script>
+<script src="notifications.js"></script>
 </body>
 </html>
