@@ -654,6 +654,31 @@ document.addEventListener('DOMContentLoaded', function () {
                 const newStatus = evt.to.getAttribute('data-status');
                 const card      = evt.item;
                 card.classList.add('task-updating');
+                
+                // Обновляем счетчики локально до получения ответа для плавности
+                const fromCountEl = evt.from.previousElementSibling.querySelector('.col-count');
+                const toCountEl   = evt.to.previousElementSibling.querySelector('.col-count');
+                if (fromCountEl && toCountEl) {
+                    fromCountEl.textContent = Math.max(0, parseInt(fromCountEl.textContent) - 1);
+                    toCountEl.textContent   = parseInt(toCountEl.textContent) + 1;
+                }
+                
+                // Проверяем, опустела ли колонка, показываем заглушку, если да
+                if (evt.from.querySelectorAll('.task-card').length === 0) {
+                    let emptyCol = evt.from.querySelector('.empty-col');
+                    if (!emptyCol) {
+                        emptyCol = document.createElement('div');
+                        emptyCol.className = 'empty-col';
+                        emptyCol.textContent = '—';
+                        evt.from.appendChild(emptyCol);
+                    }
+                }
+                // Удаляем заглушку из колонки, куда перенесли
+                const toEmptyCol = evt.to.querySelector('.empty-col');
+                if (toEmptyCol) {
+                    toEmptyCol.remove();
+                }
+
                 const fd = new FormData();
                 fd.append('id', taskId);
                 fd.append('status', newStatus);
@@ -670,6 +695,11 @@ document.addEventListener('DOMContentLoaded', function () {
                         card.classList.remove('task-updating');
                         toastMsg.innerText       = 'Связь потеряна';
                         toastEl.style.background = '#c0392b';
+                        // Откатываем счетчики при ошибке
+                        if (fromCountEl && toCountEl) {
+                            fromCountEl.textContent = parseInt(fromCountEl.textContent) + 1;
+                            toCountEl.textContent   = Math.max(0, parseInt(toCountEl.textContent) - 1);
+                        }
                         toast.show();
                     });
             }
