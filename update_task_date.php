@@ -59,6 +59,11 @@ try {
 
     $new_deadline = $new_date . ' ' . $time_part;
 
+    if (strtotime($new_deadline) < time()) {
+        echo json_encode(['success' => false, 'error' => 'Дедлайн не может быть в прошлом']);
+        exit;
+    }
+
     $updateSql = "UPDATE tasks SET deadline = :deadline WHERE id = :id";
     $updateStmt = $db->prepare($updateSql);
     $updateStmt->execute(['deadline' => $new_deadline, 'id' => $task_id]);

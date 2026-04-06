@@ -66,6 +66,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($title === '' || strlen($title) > 200) { $fieldErrors['title'] = "Название обязательно"; }
     if (!in_array($priority, ['low','medium','high'])) { $fieldErrors['priority'] = "Некорректный приоритет"; }
+    
+    // Получаем текущее значение дедлайна из БД для сравнения
+    $original_deadline = $task['deadline'] ? date('Y-m-d\TH:i', strtotime($task['deadline'])) : null;
+    
+    if ($deadline && $deadline !== $original_deadline && strtotime($deadline) < time()) { 
+        $fieldErrors['deadline'] = "Новый дедлайн не может быть в прошлом"; 
+    }
 
     if (!$fieldErrors) {
         $updateStmt = $db->prepare("
@@ -300,7 +307,12 @@ $logs = $logStmt->fetchAll(PDO::FETCH_ASSOC);
 
                     <div class="field-group">
                         <label class="field-label">Дедлайн</label>
-                        <input type="datetime-local" name="deadline" class="tp-input" value="<?= $formatted_deadline ?>">
+                        <input type="datetime-local" name="deadline" data-original-val="<?= $formatted_deadline ?>"
+                               class="tp-input <?= isset($fieldErrors['deadline']) ? 'is-invalid' : '' ?>" 
+                               value="<?= $formatted_deadline ?>">
+                        <?php if (isset($fieldErrors['deadline'])): ?>
+                            <span style="color:var(--red); font-size:11px;"><?= $fieldErrors['deadline'] ?></span>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -348,6 +360,21 @@ $logs = $logStmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </div>
 
-</div> <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</div> 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+document.querySelector('form').addEventListener('submit', function(e) {
+    const deadlineInput = document.querySelector('input[name="deadline"]');
+    if (deadlineInput && deadlineInput.value) {
+        const selectedDate = new Date(deadlineInput.value);
+        const originalVal = deadlineInput.getAttribute('data-original-val');
+        if (selectedDate < new Date() && deadlineInput.value !== originalVal) {
+            e.preventDefault();
+            alert('Новое время дедлайна не может быть в прошлом!');
+            deadlineInput.focus();
+        }
+    }
+});
+</script>
 </body>
 </html>

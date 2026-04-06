@@ -62,6 +62,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fieldErrors['project_id'] = "Выберите проект";
     }
 
+    if ($deadline && strtotime($deadline) < time()) {
+        $fieldErrors['deadline'] = "Дедлайн не может быть в прошлом";
+    }
+
     if (!$fieldErrors) {
         $stmt = $db->prepare("
             INSERT INTO tasks(title, description, priority, deadline, project_id, assigned_to, status)
@@ -346,7 +350,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <div class="field-group">
                     <label class="field-label">Дедлайн</label>
-                    <input type="datetime-local" name="deadline"
+                    <input type="datetime-local" name="deadline" min="<?= date('Y-m-d\TH:i') ?>"
                            class="tp-input <?= isset($fieldErrors['deadline']) ? 'is-invalid' : '' ?>"
                            value="<?= htmlspecialchars($deadline) ?>">
                     <?php if (isset($fieldErrors['deadline'])): ?>
@@ -386,6 +390,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 </div>
 <script>
+document.querySelector('form').addEventListener('submit', function(e) {
+    const deadlineInput = document.querySelector('input[name="deadline"]');
+    if (deadlineInput && deadlineInput.value) {
+        const selectedDate = new Date(deadlineInput.value);
+        if (selectedDate < new Date()) {
+            e.preventDefault();
+            alert('Время дедлайна не может быть в прошлом!');
+            deadlineInput.focus();
+        }
+    }
+});
+
 document.querySelector('select[name="project_id"]').addEventListener('change', async function() {
     const projectId = this.value;
     const assignedSelect = document.getElementById('assigned_to');
