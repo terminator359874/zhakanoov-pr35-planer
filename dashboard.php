@@ -205,8 +205,18 @@ if (!isset($_SESSION['user_id'])) {
         }
 
         /* ── CHART SECTION ── */
-        .chart-section {
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
             margin-top: 30px;
+        }
+        @media (max-width: 900px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .chart-section {
             background: var(--surface);
             border: 1px solid var(--border);
             border-radius: 8px;
@@ -327,19 +337,32 @@ if (!isset($_SESSION['user_id'])) {
             </div>
         </div>
 
-        <!-- ГРАФИК -->
-        <div class="chart-section">
-            <div class="chart-header">
-                <h2 class="chart-title">График выполнения по дням (история)</h2>
-                <div class="period-toggle">
-                    <button class="toggle-btn active" onclick="setPeriod('week')" id="btn-period-week">Неделя</button>
-                    <button class="toggle-btn" onclick="setPeriod('month')" id="btn-period-month">Месяц</button>
+        <!-- ГРАФИКИ -->
+        <div class="charts-grid">
+            <div class="chart-section">
+                <div class="chart-header">
+                    <h2 class="chart-title">График выполнения по дням (история)</h2>
+                    <div class="period-toggle">
+                        <button class="toggle-btn active" onclick="setPeriod('week')" id="btn-period-week">Неделя</button>
+                        <button class="toggle-btn" onclick="setPeriod('month')" id="btn-period-month">Месяц</button>
+                    </div>
+                </div>
+                
+                <div style="position: relative; height: 300px; width: 100%;">
+                    <canvas id="completionChart"></canvas>
+                    <div id="chartEmptyMessage" class="chart-empty">Нет завершенных задач за выбранный период</div>
                 </div>
             </div>
-            
-            <div style="position: relative; height: 300px; width: 100%;">
-                <canvas id="completionChart"></canvas>
-                <div id="chartEmptyMessage" class="chart-empty">Нет завершенных задач за выбранный период</div>
+
+            <!-- ПРИОРИТЕТЫ -->
+            <div class="chart-section">
+                <div class="chart-header">
+                    <h2 class="chart-title">Приоритеты</h2>
+                </div>
+                <div style="position: relative; height: 300px; width: 100%; display: flex; align-items: center; justify-content: center;">
+                    <canvas id="priorityChart"></canvas>
+                    <div id="priorityEmptyMessage" class="chart-empty">Нет данных за 12 месяцев</div>
+                </div>
             </div>
         </div>
 
@@ -371,6 +394,10 @@ if (!isset($_SESSION['user_id'])) {
                 
                 document.getElementById('val-overdue').className = '';
                 document.getElementById('val-overdue').innerText = data.overdue;
+
+                if (data.priorities) {
+                    renderPriorityChart(data.priorities);
+                }
 
                 dot.style.background = 'var(--green)';
                 
@@ -454,6 +481,64 @@ if (!isset($_SESSION['user_id'])) {
                 plugins: {
                     legend: {
                         display: false
+                    }
+                }
+            }
+        });
+    }
+
+    let priorityChartInstance = null;
+    function renderPriorityChart(priorities) {
+        const ctx = document.getElementById('priorityChart').getContext('2d');
+        const emptyMsg = document.getElementById('priorityEmptyMessage');
+        
+        const total = priorities.high + priorities.medium + priorities.low;
+        if (total === 0) {
+            emptyMsg.style.display = 'flex';
+            if (priorityChartInstance) {
+                priorityChartInstance.destroy();
+                priorityChartInstance = null;
+            }
+            return;
+        } else {
+            emptyMsg.style.display = 'none';
+        }
+
+        const dataArray = [priorities.high, priorities.medium, priorities.low];
+        
+        if (priorityChartInstance) {
+            priorityChartInstance.data.datasets[0].data = dataArray;
+            priorityChartInstance.update();
+            return;
+        }
+
+        priorityChartInstance = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Высокий', 'Средний', 'Низкий'],
+                datasets: [{
+                    data: dataArray,
+                    backgroundColor: [
+                        '#e53935', // red (high)
+                        '#e8a000', // yellow (medium)
+                        '#1e9e52'  // green (low)
+                    ],
+                    borderWidth: 0,
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '70%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            usePointStyle: true,
+                            padding: 15,
+                            font: { family: "'IBM Plex Sans', sans-serif", size: 12 }
+                        }
                     }
                 }
             }

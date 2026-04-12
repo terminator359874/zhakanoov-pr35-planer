@@ -36,7 +36,10 @@ try {
             COUNT(t.id) as total,
             SUM(CASE WHEN t.status = 'done' THEN 1 ELSE 0 END) as completed,
             SUM(CASE WHEN t.status = 'progress' THEN 1 ELSE 0 END) as in_progress,
-            SUM(CASE WHEN t.deadline < CURDATE() AND t.status != 'done' THEN 1 ELSE 0 END) as overdue
+            SUM(CASE WHEN t.deadline < CURDATE() AND t.status != 'done' THEN 1 ELSE 0 END) as overdue,
+            SUM(CASE WHEN t.priority = 'high' THEN 1 ELSE 0 END) as priority_high,
+            SUM(CASE WHEN t.priority = 'medium' THEN 1 ELSE 0 END) as priority_medium,
+            SUM(CASE WHEN t.priority = 'low' THEN 1 ELSE 0 END) as priority_low
         FROM tasks t
         WHERE t.project_id IN (
             SELECT p.id 
@@ -54,7 +57,12 @@ try {
         'total' => (int)$result['total'],
         'completed' => (int)$result['completed'],
         'in_progress' => (int)$result['in_progress'],
-        'overdue' => (int)$result['overdue']
+        'overdue' => (int)$result['overdue'],
+        'priorities' => [
+            'high' => (int)$result['priority_high'],
+            'medium' => (int)$result['priority_medium'],
+            'low' => (int)$result['priority_low']
+        ]
     ];
 
     $json = json_encode($data);
@@ -68,7 +76,8 @@ try {
         'total' => 0, 
         'completed' => 0, 
         'in_progress' => 0, 
-        'overdue' => 0
+        'overdue' => 0,
+        'priorities' => ['high' => 0, 'medium' => 0, 'low' => 0]
     ]);
 }
 ?>
