@@ -364,6 +364,17 @@ if (!isset($_SESSION['user_id'])) {
                     <div id="priorityEmptyMessage" class="chart-empty">Нет данных за 12 месяцев</div>
                 </div>
             </div>
+
+            <!-- РАСПРЕДЕЛЕНИЕ ПО ПРОЕКТАМ -->
+            <div class="chart-section" style="grid-column: 1 / -1;">
+                <div class="chart-header">
+                    <h2 class="chart-title">Распределение по проектам</h2>
+                </div>
+                <div style="position: relative; height: 350px; width: 100%;">
+                    <canvas id="projectsChart"></canvas>
+                    <div id="projectsEmptyMessage" class="chart-empty">Вы не состоите ни в одном проекте</div>
+                </div>
+            </div>
         </div>
 
     </div>
@@ -397,6 +408,10 @@ if (!isset($_SESSION['user_id'])) {
 
                 if (data.priorities) {
                     renderPriorityChart(data.priorities);
+                }
+
+                if (data.projects) {
+                    renderProjectsChart(data.projects);
                 }
 
                 dot.style.background = 'var(--green)';
@@ -540,6 +555,59 @@ if (!isset($_SESSION['user_id'])) {
                             font: { family: "'IBM Plex Sans', sans-serif", size: 12 }
                         }
                     }
+                }
+            }
+        });
+    }
+
+    let projectsChartInstance = null;
+    function renderProjectsChart(projects) {
+        const ctx = document.getElementById('projectsChart').getContext('2d');
+        const emptyMsg = document.getElementById('projectsEmptyMessage');
+        
+        if (!projects || !projects.labels || projects.labels.length === 0) {
+            emptyMsg.style.display = 'flex';
+            if (projectsChartInstance) {
+                projectsChartInstance.destroy();
+                projectsChartInstance = null;
+            }
+            return;
+        } else {
+            emptyMsg.style.display = 'none';
+        }
+
+        if (projectsChartInstance) {
+            projectsChartInstance.data.labels = projects.labels;
+            projectsChartInstance.data.datasets[0].data = projects.data;
+            projectsChartInstance.update();
+            return;
+        }
+
+        projectsChartInstance = new Chart(ctx, {
+            type: 'bar', // Горизонтальный столбчатый график
+            data: {
+                labels: projects.labels,
+                datasets: [{
+                    label: 'Задач',
+                    data: projects.data,
+                    backgroundColor: 'rgba(43, 107, 230, 0.7)', // var(--accent)
+                    borderColor: 'rgba(43, 107, 230, 1)',
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                indexAxis: 'y', // Горизонтально
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        ticks: { precision: 0 }
+                    }
+                },
+                plugins: {
+                    legend: { display: false }
                 }
             }
         });

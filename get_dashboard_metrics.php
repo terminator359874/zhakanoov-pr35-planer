@@ -53,6 +53,28 @@ try {
     $stmt->execute(['user_id' => $user_id]);
     $result = $stmt->fetch(PDO::FETCH_ASSOC);
 
+    // Distribution by projects
+    $stmtProj = $db->prepare("
+        SELECT p.name as project_name, COUNT(t.id) as count
+        FROM tasks t
+        JOIN projects p ON t.project_id = p.id
+        LEFT JOIN project_members pm ON p.id = pm.project_id
+        WHERE (p.owner_id = :user_id OR pm.user_id = :user_id)
+          AND t.created_at >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+        GROUP BY p.id
+        ORDER BY count DESC
+        LIMIT 10
+    ");
+    $stmtProj->execute(['user_id' => $user_id]);
+    $projectsDist = $stmtProj->fetchAll(PDO::FETCH_ASSOC);
+
+    $projLabels = [];
+    $projData = [];
+    foreach ($projectsDist as $row) {
+        $projLabels[] = mb_strimwidth($row['project_name'], 0, 20, '…');
+        $projData[] = (int)$row['count'];
+    }
+
     $data = [
         'total' => (int)$result['total'],
         'completed' => (int)$result['completed'],
@@ -62,6 +84,10 @@ try {
             'high' => (int)$result['priority_high'],
             'medium' => (int)$result['priority_medium'],
             'low' => (int)$result['priority_low']
+        ],
+        'projects' => [
+            'labels' => $projLabels,
+            'data' => $projData
         ]
     ];
 
@@ -77,7 +103,8 @@ try {
         'completed' => 0, 
         'in_progress' => 0, 
         'overdue' => 0,
-        'priorities' => ['high' => 0, 'medium' => 0, 'low' => 0]
+        'priorities' => ['high' => 0, 'medium' => 0, 'low' => 0],
+        'projects' => ['labels' => [], 'data' => []]
     ]);
 }
 ?>
