@@ -156,6 +156,7 @@ if (!isset($_SESSION['user_id'])) {
         .metric-done::before     { background: var(--green); }
         .metric-progress::before { background: var(--accent); }
         .metric-overdue::before  { background: var(--red); }
+        .metric-avg::before      { background: #8b5cf6; }
 
         .metric-title {
             font-size: 14px;
@@ -335,6 +336,12 @@ if (!isset($_SESSION['user_id'])) {
                     <div id="val-overdue" class="skeleton"></div>
                 </div>
             </div>
+            <div class="metric-card metric-avg">
+                <div class="metric-title">Ср. время выполнения</div>
+                <div class="metric-value" style="font-size: 28px;">
+                    <div id="val-avg" class="skeleton"></div>
+                </div>
+            </div>
         </div>
 
         <!-- ГРАФИКИ -->
@@ -405,6 +412,20 @@ if (!isset($_SESSION['user_id'])) {
                 
                 document.getElementById('val-overdue').className = '';
                 document.getElementById('val-overdue').innerText = data.overdue;
+
+                let avgMin = data.avg_minutes || 0;
+                let avgText = '-';
+                if (avgMin > 0) {
+                    if (avgMin < 60) {
+                        avgText = avgMin + ' мин';
+                    } else if (avgMin < 1440) {
+                        avgText = Math.floor(avgMin / 60) + ' ч';
+                    } else {
+                        avgText = Math.floor(avgMin / 1440) + ' дн';
+                    }
+                }
+                document.getElementById('val-avg').className = '';
+                document.getElementById('val-avg').innerText = avgText;
 
                 if (data.priorities) {
                     renderPriorityChart(data.priorities);

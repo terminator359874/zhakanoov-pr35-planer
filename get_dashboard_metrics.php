@@ -75,11 +75,35 @@ try {
         $projData[] = (int)$row['count'];
     }
 
+    // Average completion time
+    $stmtAvg = $db->prepare("
+        SELECT AVG(TIMESTAMPDIFF(MINUTE, t.created_at, comp.completed_at)) as avg_minutes
+        FROM tasks t
+        JOIN (
+            SELECT task_id, MAX(created_at) as completed_at
+            FROM project_activity
+            WHERE details LIKE '%на «Завершен%'
+            GROUP BY task_id
+        ) comp ON t.id = comp.task_id
+        WHERE t.status = 'done'
+          AND t.created_at >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+          AND t.project_id IN (
+              SELECT p.id 
+              FROM projects p
+              LEFT JOIN project_members pm ON p.id = pm.project_id
+              WHERE p.owner_id = :user_id OR pm.user_id = :user_id
+          )
+    ");
+    $stmtAvg->execute(['user_id' => $user_id]);
+    $avgResult = $stmtAvg->fetch(PDO::FETCH_ASSOC);
+    $avgMinutes = $avgResult['avg_minutes'] !== null ? round($avgResult['avg_minutes']) : 0;
+
     $data = [
         'total' => (int)$result['total'],
         'completed' => (int)$result['completed'],
         'in_progress' => (int)$result['in_progress'],
         'overdue' => (int)$result['overdue'],
+        'avg_minutes' => (int)$avgMinutes,
         'priorities' => [
             'high' => (int)$result['priority_high'],
             'medium' => (int)$result['priority_medium'],
@@ -103,6 +127,7 @@ try {
         'completed' => 0, 
         'in_progress' => 0, 
         'overdue' => 0,
+        'avg_minutes' => 0,
         'priorities' => ['high' => 0, 'medium' => 0, 'low' => 0],
         'projects' => ['labels' => [], 'data' => []]
     ]);
