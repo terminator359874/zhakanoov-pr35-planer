@@ -1,0 +1,166 @@
+<?php
+// get_dashboard_metrics.php
+error_reporting(0); // Описание: Не указывать технические ошибки
+session_start();
+header('Content-Type: application/json; charset=utf-8');
+
+if (!isset($_SESSION['user_id'])) {
+    echo json_encode(['error' => 'Not authenticated']);
+    exit;
+}
+
+$user_id = (int)$_SESSION['user_id'];
+$cacheDir = __DIR__ . '/cache';
+
+if (!is_dir($cacheDir)) {
+    @mkdir($cacheDir, 0777, true);
+}
+
+$cacheFile = $cacheDir . "/dashboard_metrics_{$user_id}.json";
+$cacheTTL = 10; // 10 секунд кеш для авто-обновления
+
+if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheTTL)) {
+    echo file_get_contents($cacheFile);
+    exit;
+}
+
+require_once 'config/database.php';
+
+try {
+    $db = (new Database())->getConnection();
+
+    // Задачи только в проектах пользователя
+    // Исключая старше 12 месяцев
+    $stmt = $db->prepare("
+        SELECT 
+            COUNT(t.id) as total,
+            SUM(CASE WHEN t.status = 'done' THEN 1 ELSE 0 END) as completed,
+            SUM(CASE WHEN t.status = 'progress' THEN 1 ELSE 0 END) as in_progress,
+            SUM(CASE WHEN t.deadline < CURDATE() AND t.status != 'done' THEN 1 ELSE 0 END) as overdue,
+            SUM(CASE WHEN t.priority = 'high' THEN 1 ELSE 0 END) as priority_high,
+            SUM(CASE WHEN t.priority = 'medium' THEN 1 ELSE 0 END) as priority_medium,
+            SUM(CASE WHEN t.priority = 'low' THEN 1 ELSE 0 END) as priority_low
+        FROM tasks t
+        WHERE t.project_id IN (
+            SELECT p.id 
+            FROM projects p
+            LEFT JOIN project_members pm ON p.id = pm.project_id
+            WHERE p.owner_id = :user_id OR pm.user_id = :user_id
+        )
+        AND t.created_at >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+    ");
+    
+    $stmt->execute(['user_id' => $user_id]);
+    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    // Distribution by projects
+    $stmtProj = $db->prepare("
+        SELECT p.name as project_name, COUNT(t.id) as count
+        FROM tasks t
+        JOIN projects p ON t.project_id = p.id
+        LEFT JOIN project_members pm ON p.id = pm.project_id
+        WHERE (p.owner_id = :user_id OR pm.user_id = :user_id)
+          AND t.created_at >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+        GROUP BY p.id
+        ORDER BY count DESC
+        LIMIT 10
+    ");
+    $stmtProj->execute(['user_id' => $user_id]);
+    $projectsDist = $stmtProj->fetchAll(PDO::FETCH_ASSOC);
+
+    $projLabels = [];
+    $projData = [];
+    foreach ($projectsDist as $row) {
+        $projLabels[] = mb_strimwidth($row['project_name'], 0, 20, '…');
+        $projData[] = (int)$row['count'];
+    }
+
+    // Teams (Projects) metrics comparison
+    $stmtTeams = $db->prepare("
+        SELECT 
+            p.name as team_name,
+            SUM(CASE WHEN t.status = 'done' THEN 1 ELSE 0 END) as completed,
+            SUM(CASE WHEN t.status = 'progress' THEN 1 ELSE 0 END) as in_progress,
+            SUM(CASE WHEN t.deadline < CURDATE() AND t.status != 'done' THEN 1 ELSE 0 END) as overdue
+        FROM tasks t
+        JOIN projects p ON t.project_id = p.id
+        LEFT JOIN project_members pm ON p.id = pm.project_id
+        WHERE (p.owner_id = :user_id OR pm.user_id = :user_id)
+          AND t.created_at >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+        GROUP BY p.id
+        ORDER BY COUNT(t.id) DESC
+        LIMIT 5
+    ");
+    $stmtTeams->execute(['user_id' => $user_id]);
+    $teamsDist = $stmtTeams->fetchAll(PDO::FETCH_ASSOC);
+    
+    $teamsComp = [];
+    foreach ($teamsDist as $row) {
+        $teamsComp[] = [
+            'name' => mb_strimwidth($row['team_name'], 0, 15, '…'),
+            'completed' => (int)$row['completed'],
+            'in_progress' => (int)$row['in_progress'],
+            'overdue' => (int)$row['overdue']
+        ];
+    }
+
+    // Average completion time
+    $stmtAvg = $db->prepare("
+        SELECT AVG(TIMESTAMPDIFF(MINUTE, t.created_at, comp.completed_at)) as avg_minutes
+        FROM tasks t
+        JOIN (
+            SELECT task_id, MAX(created_at) as completed_at
+            FROM project_activity
+            WHERE details LIKE '%на «Завершен%'
+            GROUP BY task_id
+        ) comp ON t.id = comp.task_id
+        WHERE t.status = 'done'
+          AND t.created_at >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+          AND t.project_id IN (
+              SELECT p.id 
+              FROM projects p
+              LEFT JOIN project_members pm ON p.id = pm.project_id
+              WHERE p.owner_id = :user_id OR pm.user_id = :user_id
+          )
+    ");
+    $stmtAvg->execute(['user_id' => $user_id]);
+    $avgResult = $stmtAvg->fetch(PDO::FETCH_ASSOC);
+    $avgMinutes = $avgResult['avg_minutes'] !== null ? round($avgResult['avg_minutes']) : 0;
+
+    $data = [
+        'total' => (int)$result['total'],
+        'completed' => (int)$result['completed'],
+        'in_progress' => (int)$result['in_progress'],
+        'overdue' => (int)$result['overdue'],
+        'avg_minutes' => (int)$avgMinutes,
+        'priorities' => [
+            'high' => (int)$result['priority_high'],
+            'medium' => (int)$result['priority_medium'],
+            'low' => (int)$result['priority_low']
+        ],
+        'projects' => [
+            'labels' => $projLabels,
+            'data' => $projData
+        ],
+        'teams' => $teamsComp
+    ];
+
+    $json = json_encode($data);
+    @file_put_contents($cacheFile, $json);
+
+    echo $json;
+
+} catch (Exception $e) {
+    // Не показываем ошибку пользователю, возвращаем нули
+    echo json_encode([
+        'total' => 0, 
+        'completed' => 0, 
+        'in_progress' => 0, 
+        'overdue' => 0,
+        'avg_minutes' => 0,
+        'priorities' => ['high' => 0, 'medium' => 0, 'low' => 0],
+        'projects' => ['labels' => [], 'data' => []],
+        'teams' => []
+    ]);
+}
+?>
