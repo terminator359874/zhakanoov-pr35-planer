@@ -311,6 +311,7 @@ if (!isset($_SESSION['user_id'])) {
                 <div class="refresh-status" id="refreshStatus" data-html2canvas-ignore="true">
                     <span class="status-dot"></span> <span id="refreshText">Обновлено только что</span>
                 </div>
+                <button onclick="exportToCSV()" class="topbar-btn" data-html2canvas-ignore="true" style="padding: 6px 12px; height: auto;">⬇️ Скачать CSV</button>
                 <button onclick="exportToPDF()" class="topbar-btn primary" data-html2canvas-ignore="true" style="padding: 6px 12px; height: auto;">📄 Скачать PDF</button>
             </div>
         </div>
@@ -403,6 +404,8 @@ if (!isset($_SESSION['user_id'])) {
 </div>
 
 <script>
+    let dashboardData = null;
+
     async function loadMetrics() {
         const dot = document.querySelector('.status-dot');
         const text = document.getElementById('refreshText');
@@ -414,6 +417,7 @@ if (!isset($_SESSION['user_id'])) {
             const response = await fetch('get_dashboard_metrics.php');
             if (response.ok) {
                 const data = await response.json();
+                dashboardData = data;
                 
                 // Удаляем скелетоны и ставим значения
                 document.getElementById('val-total').className = '';
@@ -758,6 +762,57 @@ if (!isset($_SESSION['user_id'])) {
             btn.innerText = originalText;
             alert('Произошла ошибка при экспорте в PDF');
         });
+    }
+
+    // CSV Export Functionality
+    function exportToCSV() {
+        if (!dashboardData) {
+            alert('Данные еще не загрузились');
+            return;
+        }
+
+        // BOM для корректного отображения кириллицы в Excel + разделитель точка с запятой
+        let csv = "\uFEFF";
+        
+        csv += "Глобальные показатели;Значение\n";
+        csv += "Всего задач;" + dashboardData.total + "\n";
+        csv += "Выполнено;" + dashboardData.completed + "\n";
+        csv += "В процессе;" + dashboardData.in_progress + "\n";
+        csv += "Просрочено;" + dashboardData.overdue + "\n";
+        csv += "Ср. время выполнения (мин);" + dashboardData.avg_minutes + "\n\n";
+        
+        if (dashboardData.priorities) {
+            csv += "Приоритеты;Количество\n";
+            csv += "Высокий;" + dashboardData.priorities.high + "\n";
+            csv += "Средний;" + dashboardData.priorities.medium + "\n";
+            csv += "Низкий;" + dashboardData.priorities.low + "\n\n";
+        }
+
+        if (dashboardData.projects && dashboardData.projects.labels) {
+            csv += "Проекты;Количество задач\n";
+            dashboardData.projects.labels.forEach((label, i) => {
+                let safeLabel = String(label).replace(/"/g, '""');
+                csv += `"${safeLabel}";${dashboardData.projects.data[i]}\n`;
+            });
+            csv += "\n";
+        }
+
+        if (dashboardData.teams && dashboardData.teams.length > 0) {
+            csv += "Сравнение команд;Выполнено;В процессе;Просрочено\n";
+            dashboardData.teams.forEach(t => {
+                let safeName = String(t.name).replace(/"/g, '""');
+                csv += `"${safeName}";${t.completed};${t.in_progress};${t.overdue}\n`;
+            });
+        }
+
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", "analytics_report.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     }
 
     // Загружаем метрики при загрузке страницы
