@@ -16,6 +16,7 @@ if (!isset($_SESSION['user_id'])) {
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         :root {
             --bg:        #f0f2f5;
@@ -299,15 +300,18 @@ if (!isset($_SESSION['user_id'])) {
 </div>
 
 <div class="main-area">
-    <div class="dashboard-container">
+    <div class="dashboard-container" id="dashboard-content">
         
         <div class="dashboard-header">
             <div>
                 <h1 class="dash-title">Аналитика задач</h1>
                 <div class="dash-subtitle">Данные за последние 12 месяцев. Показатели по всем доступным проектам.</div>
             </div>
-            <div class="refresh-status" id="refreshStatus">
-                <span class="status-dot"></span> <span id="refreshText">Обновлено только что</span>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <div class="refresh-status" id="refreshStatus" data-html2canvas-ignore="true">
+                    <span class="status-dot"></span> <span id="refreshText">Обновлено только что</span>
+                </div>
+                <button onclick="exportToPDF()" class="topbar-btn primary" data-html2canvas-ignore="true" style="padding: 6px 12px; height: auto;">📄 Скачать PDF</button>
             </div>
         </div>
 
@@ -349,7 +353,7 @@ if (!isset($_SESSION['user_id'])) {
             <div class="chart-section">
                 <div class="chart-header">
                     <h2 class="chart-title">График выполнения по дням (история)</h2>
-                    <div class="period-toggle">
+                    <div class="period-toggle" data-html2canvas-ignore="true">
                         <button class="toggle-btn active" onclick="setPeriod('week')" id="btn-period-week">Неделя</button>
                         <button class="toggle-btn" onclick="setPeriod('month')" id="btn-period-month">Месяц</button>
                     </div>
@@ -729,6 +733,30 @@ if (!isset($_SESSION['user_id'])) {
                     }
                 }
             }
+        });
+    }
+
+    // PDF Export Functionality
+    function exportToPDF() {
+        const element = document.getElementById('dashboard-content');
+        const opt = {
+            margin:       [10, 10, 10, 10], // top, left, bottom, right
+            filename:     'analytics_report.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#f0f2f5' },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+        
+        // Notify user
+        const btn = document.querySelector('button[onclick="exportToPDF()"]');
+        const originalText = btn.innerText;
+        btn.innerText = '⏳ Подготовка...';
+        
+        html2pdf().set(opt).from(element).save().then(() => {
+            btn.innerText = originalText;
+        }).catch(() => {
+            btn.innerText = originalText;
+            alert('Произошла ошибка при экспорте в PDF');
         });
     }
 
