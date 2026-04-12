@@ -75,6 +75,35 @@ try {
         $projData[] = (int)$row['count'];
     }
 
+    // Teams (Projects) metrics comparison
+    $stmtTeams = $db->prepare("
+        SELECT 
+            p.name as team_name,
+            SUM(CASE WHEN t.status = 'done' THEN 1 ELSE 0 END) as completed,
+            SUM(CASE WHEN t.status = 'progress' THEN 1 ELSE 0 END) as in_progress,
+            SUM(CASE WHEN t.deadline < CURDATE() AND t.status != 'done' THEN 1 ELSE 0 END) as overdue
+        FROM tasks t
+        JOIN projects p ON t.project_id = p.id
+        LEFT JOIN project_members pm ON p.id = pm.project_id
+        WHERE (p.owner_id = :user_id OR pm.user_id = :user_id)
+          AND t.created_at >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+        GROUP BY p.id
+        ORDER BY COUNT(t.id) DESC
+        LIMIT 5
+    ");
+    $stmtTeams->execute(['user_id' => $user_id]);
+    $teamsDist = $stmtTeams->fetchAll(PDO::FETCH_ASSOC);
+    
+    $teamsComp = [];
+    foreach ($teamsDist as $row) {
+        $teamsComp[] = [
+            'name' => mb_strimwidth($row['team_name'], 0, 15, '…'),
+            'completed' => (int)$row['completed'],
+            'in_progress' => (int)$row['in_progress'],
+            'overdue' => (int)$row['overdue']
+        ];
+    }
+
     // Average completion time
     $stmtAvg = $db->prepare("
         SELECT AVG(TIMESTAMPDIFF(MINUTE, t.created_at, comp.completed_at)) as avg_minutes
@@ -112,7 +141,8 @@ try {
         'projects' => [
             'labels' => $projLabels,
             'data' => $projData
-        ]
+        ],
+        'teams' => $teamsComp
     ];
 
     $json = json_encode($data);
@@ -129,7 +159,8 @@ try {
         'overdue' => 0,
         'avg_minutes' => 0,
         'priorities' => ['high' => 0, 'medium' => 0, 'low' => 0],
-        'projects' => ['labels' => [], 'data' => []]
+        'projects' => ['labels' => [], 'data' => []],
+        'teams' => []
     ]);
 }
 ?>

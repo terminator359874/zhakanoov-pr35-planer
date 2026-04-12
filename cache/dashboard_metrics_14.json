@@ -1,1 +1,1 @@
-{"total":3,"completed":3,"in_progress":0,"overdue":0,"avg_minutes":7,"priorities":{"high":1,"medium":2,"low":0},"projects":{"labels":["2","1"],"data":[2,1]}}
+{"total":3,"completed":1,"in_progress":1,"overdue":0,"avg_minutes":19,"priorities":{"high":1,"medium":2,"low":0},"projects":{"labels":["2","1"],"data":[2,1]},"teams":[{"name":"2","completed":0,"in_progress":1,"overdue":0},{"name":"1","completed":1,"in_progress":0,"overdue":0}]}

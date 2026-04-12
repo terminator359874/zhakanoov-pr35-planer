@@ -375,11 +375,22 @@ if (!isset($_SESSION['user_id'])) {
             <!-- РАСПРЕДЕЛЕНИЕ ПО ПРОЕКТАМ -->
             <div class="chart-section" style="grid-column: 1 / -1;">
                 <div class="chart-header">
-                    <h2 class="chart-title">Распределение по проектам</h2>
+                    <h2 class="chart-title">РАСПРЕДЕЛЕНИЕ ПО ПРОЕКТАМ</h2>
                 </div>
                 <div style="position: relative; height: 350px; width: 100%;">
                     <canvas id="projectsChart"></canvas>
                     <div id="projectsEmptyMessage" class="chart-empty">Вы не состоите ни в одном проекте</div>
+                </div>
+            </div>
+
+            <!-- СРАВНЕНИЕ КОМАНД -->
+            <div class="chart-section" style="grid-column: 1 / -1;">
+                <div class="chart-header">
+                    <h2 class="chart-title">Сравнение команд (Статусы по проектам)</h2>
+                </div>
+                <div style="position: relative; height: 350px; width: 100%;">
+                    <canvas id="teamsChart"></canvas>
+                    <div id="teamsEmptyMessage" class="chart-empty">Нет данных для сравнения</div>
                 </div>
             </div>
         </div>
@@ -433,6 +444,10 @@ if (!isset($_SESSION['user_id'])) {
 
                 if (data.projects) {
                     renderProjectsChart(data.projects);
+                }
+
+                if (data.teams) {
+                    renderTeamsChart(data.teams);
                 }
 
                 dot.style.background = 'var(--green)';
@@ -629,6 +644,89 @@ if (!isset($_SESSION['user_id'])) {
                 },
                 plugins: {
                     legend: { display: false }
+                }
+            }
+        });
+    }
+
+    let teamsChartInstance = null;
+    function renderTeamsChart(teams) {
+        const ctx = document.getElementById('teamsChart').getContext('2d');
+        const emptyMsg = document.getElementById('teamsEmptyMessage');
+        
+        if (!teams || teams.length === 0) {
+            emptyMsg.style.display = 'flex';
+            if (teamsChartInstance) {
+                teamsChartInstance.destroy();
+                teamsChartInstance = null;
+            }
+            return;
+        } else {
+            emptyMsg.style.display = 'none';
+        }
+
+        const labels = teams.map(t => t.name);
+        const dataCompleted = teams.map(t => t.completed);
+        const dataInProgress = teams.map(t => t.in_progress);
+        const dataOverdue = teams.map(t => t.overdue);
+
+        if (teamsChartInstance) {
+            teamsChartInstance.data.labels = labels;
+            teamsChartInstance.data.datasets[0].data = dataCompleted;
+            teamsChartInstance.data.datasets[1].data = dataInProgress;
+            teamsChartInstance.data.datasets[2].data = dataOverdue;
+            teamsChartInstance.update();
+            return;
+        }
+
+        teamsChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Выполнено',
+                        data: dataCompleted,
+                        backgroundColor: 'rgba(30, 158, 82, 0.8)', // var(--green)
+                        borderColor: 'rgba(30, 158, 82, 1)',
+                        borderWidth: 1,
+                        borderRadius: 2
+                    },
+                    {
+                        label: 'В процессе',
+                        data: dataInProgress,
+                        backgroundColor: 'rgba(43, 107, 230, 0.8)', // var(--accent)
+                        borderColor: 'rgba(43, 107, 230, 1)',
+                        borderWidth: 1,
+                        borderRadius: 2
+                    },
+                    {
+                        label: 'Просрочено',
+                        data: dataOverdue,
+                        backgroundColor: 'rgba(229, 57, 53, 0.8)', // var(--red)
+                        borderColor: 'rgba(229, 57, 53, 1)',
+                        borderWidth: 1,
+                        borderRadius: 2
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { precision: 0 }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            usePointStyle: true,
+                            font: { family: "'IBM Plex Sans', sans-serif", size: 12 }
+                        }
+                    }
                 }
             }
         });
