@@ -15,6 +15,7 @@ if (!isset($_SESSION['user_id'])) {
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --bg:        #f0f2f5;
@@ -203,6 +204,73 @@ if (!isset($_SESSION['user_id'])) {
             background: var(--green);
         }
 
+        /* ── CHART SECTION ── */
+        .chart-section {
+            margin-top: 30px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+            position: relative;
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .chart-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-head);
+            margin: 0;
+        }
+
+        .period-toggle {
+            display: flex;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .toggle-btn {
+            background: var(--surface);
+            border: none;
+            padding: 6px 14px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .toggle-btn.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        .toggle-btn:not(.active):hover {
+            background: var(--surface2);
+            color: var(--text-head);
+        }
+
+        .chart-empty {
+            position: absolute;
+            top: 70px; left: 0; right: 0; bottom: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.9);
+            color: var(--text-dim);
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 10;
+        }
+
+
     </style>
 </head>
 <body>
@@ -259,6 +327,22 @@ if (!isset($_SESSION['user_id'])) {
             </div>
         </div>
 
+        <!-- ГРАФИК -->
+        <div class="chart-section">
+            <div class="chart-header">
+                <h2 class="chart-title">График выполнения по дням (история)</h2>
+                <div class="period-toggle">
+                    <button class="toggle-btn active" onclick="setPeriod('week')" id="btn-period-week">Неделя</button>
+                    <button class="toggle-btn" onclick="setPeriod('month')" id="btn-period-month">Месяц</button>
+                </div>
+            </div>
+            
+            <div style="position: relative; height: 300px; width: 100%;">
+                <canvas id="completionChart"></canvas>
+                <div id="chartEmptyMessage" class="chart-empty">Нет завершенных задач за выбранный период</div>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -303,11 +387,88 @@ if (!isset($_SESSION['user_id'])) {
         }
     }
 
+    // --- Chart Logic ---
+    let completionChart = null;
+    let currentPeriod = 'week';
+
+    function setPeriod(period) {
+        currentPeriod = period;
+        document.getElementById('btn-period-week').classList.toggle('active', period === 'week');
+        document.getElementById('btn-period-month').classList.toggle('active', period === 'month');
+        loadChart();
+    }
+
+    async function loadChart() {
+        try {
+            const response = await fetch(`get_chart_data.php?period=${currentPeriod}`);
+            if (!response.ok) return;
+            const data = await response.json();
+            
+            const emptyMsg = document.getElementById('chartEmptyMessage');
+            if (!data.hasData) {
+                emptyMsg.style.display = 'flex';
+            } else {
+                emptyMsg.style.display = 'none';
+            }
+
+            renderChart(data.labels, data.data);
+        } catch (e) {
+            // Игнорируем ошибки (Не показывать технические ошибки)
+        }
+    }
+
+    function renderChart(labels, dataArray) {
+        const ctx = document.getElementById('completionChart').getContext('2d');
+        
+        if (completionChart) {
+            completionChart.data.labels = labels;
+            completionChart.data.datasets[0].data = dataArray;
+            completionChart.update();
+            return;
+        }
+
+        completionChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Завершено задач',
+                    data: dataArray,
+                    backgroundColor: 'rgba(30, 158, 82, 0.8)', // var(--green)
+                    borderColor: 'rgba(30, 158, 82, 1)',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0 // только целые числа
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+    }
+
     // Загружаем метрики при загрузке страницы
     loadMetrics();
+    loadChart();
 
     // Настраиваем периодическое обновление каждые 5 секунд
-    setInterval(loadMetrics, 5000);
+    setInterval(() => {
+        loadMetrics();
+        loadChart();
+    }, 5000);
 </script>
 
 <!-- Фоновая музыка аналогично index.php (если требуется) -->
