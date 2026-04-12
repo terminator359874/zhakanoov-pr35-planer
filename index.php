@@ -448,6 +448,7 @@ $invitesCount = count($invitations);
     <a href="create_task.php" class="topbar-btn primary">+ Задача</a>
     <a href="create_project.php" class="topbar-btn">+ Проект</a>
     <a href="calendar.php" class="topbar-btn" style="color:var(--accent); border-color:var(--accent);">📅 Календарь</a>
+    <a href="dashboard.php" class="topbar-btn">📊 Дашборд</a>
     <div class="topbar-spacer"></div>
     <?php if ($invitesCount > 0): ?>
     <button class="topbar-btn" style="border-color:var(--yellow); color:var(--yellow);" data-bs-toggle="modal" data-bs-target="#invitesModal">
