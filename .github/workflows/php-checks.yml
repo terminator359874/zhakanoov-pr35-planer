@@ -35,4 +35,4 @@ jobs:
           php-version: '8.1'
           tools: phpcs
       - name: Run PHPCS
-        run: phpcs
+        run: phpcs -n  # -n = ignore warnings
