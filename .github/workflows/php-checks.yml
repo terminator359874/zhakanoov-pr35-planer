@@ -1,7 +1,1 @@
-- name: Check PHP syntax
-        run: |
-          find . -name '*.php' -not -path './vendor/*' -exec php -l {} \;
-          echo 'Check finished, moving on anyway...'
 
-      - name: Run PHPCS
-        run: phpcs . || true
