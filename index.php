@@ -11,15 +11,27 @@ $database = new Database();
 $db = $database->getConnection();
 $user_id = $_SESSION['user_id'];
 
+// Авто-миграция: колонка visibility
+try {
+    $colChk = $db->query("SHOW COLUMNS FROM projects LIKE 'visibility'");
+    if ($colChk->rowCount() === 0) {
+        $db->exec("ALTER TABLE projects ADD COLUMN visibility VARCHAR(10) NOT NULL DEFAULT 'private'");
+    }
+} catch (Exception $e) {}
+
 $stmt = $db->prepare("
-    SELECT p.id, p.name 
+    SELECT p.id, p.name, p.visibility,
+           IF(p.owner_id = ? OR EXISTS(
+               SELECT 1 FROM project_members pm WHERE pm.project_id = p.id AND pm.user_id = ?
+           ), 1, 0) as is_member
     FROM projects p
-    LEFT JOIN project_members pm ON p.id = pm.project_id
-    WHERE p.owner_id = :user_id OR pm.user_id = :user_id
+    WHERE p.owner_id = ?
+       OR p.visibility = 'public'
+       OR EXISTS(SELECT 1 FROM project_members pm2 WHERE pm2.project_id = p.id AND pm2.user_id = ?)
     GROUP BY p.id
-    ORDER BY p.name
+    ORDER BY is_member DESC, p.name ASC
 ");
-$stmt->execute(['user_id' => $user_id]);
+$stmt->execute([$user_id, $user_id, $user_id, $user_id]);
 $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $stmtEmail = $db->prepare("SELECT email FROM users WHERE id = ?");
@@ -652,8 +664,11 @@ $invitesCount = count($invitations);
                 $total = $stmt2->fetchColumn();
                 ?>
                 <div class="proj-tab <?= $i === 0 ? 'active' : '' ?>" onclick="switchProject(<?= $project['id'] ?>, this)">
-                    <?= htmlspecialchars($project['name']) ?>
+                    <?= $project['visibility'] === 'public' ? '🌐 ' : '🔒 ' ?><?= htmlspecialchars($project['name']) ?>
                     <span class="tab-count"><?= $total ?></span>
+                    <?php if (!$project['is_member']): ?>
+                        <span style="font-size:9px;color:var(--text-dim);margin-left:2px;">(просмотр)</span>
+                    <?php endif; ?>
                 </div>
             <?php endforeach; ?>
         </div>
@@ -676,17 +691,25 @@ $invitesCount = count($invitations);
                     $dots = ['new' => 'dot-new', 'progress' => 'dot-progress', 'done' => 'dot-done', 'deferred' => 'dot-deferred'];
                     ?>
                     <div class="project-board" id="board-<?= $project['id'] ?>"
+                        data-readonly="<?= $project['is_member'] ? '0' : '1' ?>"
                         style="display:<?= $i === 0 ? 'flex' : 'none' ?>;flex-direction:column;flex:1;overflow:hidden;">
 
                         <div class="board-toolbar">
                             <span class="board-label"><?= htmlspecialchars($project['name']) ?></span>
+                            <?php if ($project['visibility'] === 'public' && !$project['is_member']): ?>
+                                <span style="font-size:11px;color:var(--accent);background:rgba(43,107,230,.08);padding:3px 10px;border-radius:4px;border:1px solid rgba(43,107,230,.2);">🌐 Публичный &middot; только просмотр</span>
+                            <?php endif; ?>
                             <div class="board-toolbar-spacer"></div>
+                            <?php if ($project['is_member']): ?>
                             <form class="invite-wrap" onsubmit="inviteUser(event, <?= $project['id'] ?>)" style="margin:0;">
                                 <input type="email" name="email" placeholder="Email для приглашения" required>
                                 <button type="submit" class="topbar-btn primary">Пригласить</button>
                             </form>
                             <div id="invite-msg-<?= $project['id'] ?>" class="invite-msg" style="display:none;"></div>
                             <button class="members-btn" onclick="openMembersModal(<?= $project['id'] ?>)">👥 Участники</button>
+                            <?php else: ?>
+                            <button class="members-btn" onclick="openMembersModal(<?= $project['id'] ?>)">👥 Участники</button>
+                            <?php endif; ?>
                         </div>
 
                         <div class="board-canvas">
@@ -697,7 +720,8 @@ $invitesCount = count($invitations);
                                         <span class="col-title"><?= $titles[$status] ?></span>
                                         <span class="col-count"><?= count($status_tasks) ?></span>
                                     </div>
-                                    <div class="col-body" data-status="<?= $status ?>" data-project-id="<?= $project['id'] ?>">
+                                    <div class="col-body" data-status="<?= $status ?>" data-project-id="<?= $project['id'] ?>"
+                                         <?= !$project['is_member'] ? 'style="pointer-events:none;opacity:0.85;"' : '' ?>>
                                         <?php if (empty($status_tasks)): ?>
                                             <div class="empty-col">—</div>
                                         <?php endif; ?>
@@ -834,6 +858,10 @@ $invitesCount = count($invitations);
             const toastMsg = document.getElementById('toastMessage');
 
             document.querySelectorAll('.col-body').forEach(col => {
+                // Не инициализируем Sortable для read-only (публичных) досок
+                const board = col.closest('.project-board');
+                if (board && board.dataset.readonly === '1') return;
+
                 new Sortable(col, {
                     group: 'tasks-' + col.getAttribute('data-project-id'),
                     animation: 150,
