@@ -55,6 +55,13 @@ try {
         throw new Exception('Приглашение уже отправлено этому пользователю и ожидает ответа.');
     }
 
+    // Проверяем лимит участников (макс. 50)
+    $stmtCount = $db->prepare("SELECT COUNT(*) FROM project_members WHERE project_id = ?");
+    $stmtCount->execute([$project_id]);
+    if ((int)$stmtCount->fetchColumn() >= 50) {
+        throw new Exception('Достигнут лимит участников проекта (максимум 50).');
+    }
+
     // Создаем приглашение
     $stmt = $db->prepare("INSERT INTO project_invitations (project_id, from_user_id, to_email, status) VALUES (?, ?, ?, 'pending')");
     $stmt->execute([$project_id, $current_user_id, $email]);

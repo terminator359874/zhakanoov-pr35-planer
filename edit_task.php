@@ -292,7 +292,11 @@ $logs = $logStmt->fetchAll(PDO::FETCH_ASSOC);
 
                 <div class="field-group">
                     <label class="field-label">Описание</label>
-                    <textarea name="description" class="tp-textarea" rows="4"><?= htmlspecialchars($task['description']) ?></textarea>
+                    <textarea name="description" id="descInput" class="tp-textarea" rows="4" maxlength="5000"><?= htmlspecialchars($task['description']) ?></textarea>
+                    <div style="display:flex;justify-content:space-between;margin-top:3px;">
+                        <span id="autoSaveStatus" style="font-size:10px;color:var(--text-dim);"></span>
+                        <span id="descCount" style="font-size:10px;color:var(--text-dim);">0 / 5000</span>
+                    </div>
                 </div>
 
                 <div class="field-row">
@@ -363,6 +367,47 @@ $logs = $logStmt->fetchAll(PDO::FETCH_ASSOC);
 </div> 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+// Счётчик символов
+const descInput = document.getElementById('descInput');
+const descCount = document.getElementById('descCount');
+const autoSaveStatus = document.getElementById('autoSaveStatus');
+if (descInput && descCount) {
+    const updateCount = () => { descCount.textContent = descInput.value.length + ' / 5000'; };
+    descInput.addEventListener('input', updateCount);
+    updateCount();
+}
+
+// Автосохранение (debounce 2с)
+let autoSaveTimer = null;
+function triggerAutoSave() {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(async () => {
+        const form = document.querySelector('form');
+        const fd = new FormData(form);
+        if (autoSaveStatus) { autoSaveStatus.textContent = 'Сохранение...'; autoSaveStatus.style.color = 'var(--text-dim)'; }
+        try {
+            const r = await fetch('autosave_task.php', { method: 'POST', body: fd });
+            const data = await r.json();
+            if (autoSaveStatus) {
+                if (data.success) {
+                    autoSaveStatus.textContent = 'Автосохранено в ' + data.saved_at;
+                    autoSaveStatus.style.color = 'var(--green)';
+                } else {
+                    autoSaveStatus.textContent = 'Ошибка: ' + data.error;
+                    autoSaveStatus.style.color = 'var(--red)';
+                }
+            }
+        } catch (e) {
+            if (autoSaveStatus) { autoSaveStatus.textContent = 'Сеть недоступна'; autoSaveStatus.style.color = 'var(--red)'; }
+        }
+    }, 2000);
+}
+
+// Навешиваем автосохранение на изменение полей
+const autoSaveFields = document.querySelectorAll('input[name="title"], textarea[name="description"], select[name="priority"]');
+autoSaveFields.forEach(el => el.addEventListener('input', triggerAutoSave));
+
+// Валидация дедлайна
 document.querySelector('form').addEventListener('submit', function(e) {
     const deadlineInput = document.querySelector('input[name="deadline"]');
     if (deadlineInput && deadlineInput.value) {

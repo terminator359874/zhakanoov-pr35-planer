@@ -17,6 +17,14 @@ if (!isset($_SESSION['user_id'])) {
 $user_id = $_SESSION['user_id'];
 $db = (new Database())->getConnection();
 
+// Авто-миграция: добавляем поле recurrence если не существует
+try {
+    $colCheck = $db->query("SHOW COLUMNS FROM tasks LIKE 'recurrence'");
+    if ($colCheck->rowCount() === 0) {
+        $db->exec("ALTER TABLE tasks ADD COLUMN recurrence VARCHAR(20) DEFAULT NULL");
+    }
+} catch (Exception $e) { /* игнорируем */ }
+
 // --- ФУНКЦИЯ ЛОГИРОВАНИЯ ---
 function logActivity($db, $projectId, $userId, $details, $taskId = null) {
     $stmt = $db->prepare("INSERT INTO project_activity (project_id, user_id, details, task_id) VALUES (?, ?, ?, ?)");
@@ -35,7 +43,7 @@ $stmt->execute(['user_id' => $user_id]);
 $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $fieldErrors = [];
-$title = $description = $priority = $deadline = $project_id = $assigned_to = $success = '';
+$title = $description = $priority = $deadline = $project_id = $assigned_to = $recurrence = $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $title       = trim($_POST['title'] ?? '');
@@ -44,8 +52,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $deadline    = $_POST['deadline'] ?? null;
     $project_id  = $_POST['project_id'] ?? null;
     $assigned_to = !empty($_POST['assigned_to']) ? (int)$_POST['assigned_to'] : null;
+    $recurrence  = in_array($_POST['recurrence'] ?? '', ['daily','weekly','monthly']) ? $_POST['recurrence'] : null;
 
     if ($title === '' || strlen($title) > 200) { $fieldErrors['title'] = "Название обязательно"; }
+    if (mb_strlen($description) > 5000) { $fieldErrors['description'] = "Описание не может превышать 5000 символов"; }
     if (!in_array($priority, ['low','medium','high'])) { $fieldErrors['priority'] = "Некорректный приоритет"; }
     
     if ($project_id) {
@@ -66,10 +76,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fieldErrors['deadline'] = "Дедлайн не может быть в прошлом";
     }
 
+    // Лимит 1000 задач на пользователя
+    if (!$fieldErrors) {
+        $countStmt = $db->prepare("SELECT COUNT(*) FROM tasks t JOIN projects p ON t.project_id = p.id LEFT JOIN project_members pm ON p.id = pm.project_id WHERE (p.owner_id = :uid OR pm.user_id = :uid)");
+        $countStmt->execute(['uid' => $user_id]);
+        if ((int)$countStmt->fetchColumn() >= 1000) {
+            $fieldErrors['title'] = 'Достигнут лимит задач (максимум 1000). Удалите лишние задачи.';
+        }
+    }
+
     if (!$fieldErrors) {
         $stmt = $db->prepare("
-            INSERT INTO tasks(title, description, priority, deadline, project_id, assigned_to, status)
-            VALUES(:title, :description, :priority, :deadline, :project_id, :assigned_to, 'new')
+            INSERT INTO tasks(title, description, priority, deadline, project_id, assigned_to, status, recurrence)
+            VALUES(:title, :description, :priority, :deadline, :project_id, :assigned_to, 'new', :recurrence)
         ");
         $stmt->bindValue(":title", $title);
         $stmt->bindValue(":description", $description);
@@ -77,6 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->bindValue(":project_id", $project_id);
         $stmt->bindValue(":assigned_to", $assigned_to, $assigned_to ? PDO::PARAM_INT : PDO::PARAM_NULL);
         $stmt->bindValue(":deadline", $deadline ?: null, $deadline ? PDO::PARAM_STR : PDO::PARAM_NULL);
+        $stmt->bindValue(":recurrence", $recurrence ?: null, $recurrence ? PDO::PARAM_STR : PDO::PARAM_NULL);
         
         if ($stmt->execute()) {
             $lastTaskId = $db->lastInsertId();
@@ -330,8 +350,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <!-- Описание -->
             <div class="field-group">
                 <label class="field-label">Описание</label>
-                <textarea name="description" class="tp-textarea <?= isset($fieldErrors['description']) ? 'is-invalid' : '' ?>"
-                          rows="4" placeholder="Опишите задачу..."><?= htmlspecialchars($description) ?></textarea>
+                <textarea name="description" id="descInput" class="tp-textarea <?= isset($fieldErrors['description']) ? 'is-invalid' : '' ?>"
+                          rows="4" placeholder="Опишите задачу..." maxlength="5000"><?= htmlspecialchars($description) ?></textarea>
+                <div style="display:flex;justify-content:space-between;margin-top:3px;">
+                    <?php if (isset($fieldErrors['description'])): ?>
+                        <span class="field-error"><?= htmlspecialchars($fieldErrors['description']) ?></span>
+                    <?php else: ?>
+                        <span></span>
+                    <?php endif; ?>
+                    <span id="descCount" style="font-size:10px;color:var(--text-dim);">0 / 5000</span>
+                </div>
             </div>
 
             <!-- Приоритет + Дедлайн -->
@@ -380,6 +408,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <option value="">— сначала выберите проект —</option>
     </select>
 </div>
+<div class="field-group">
+    <label class="field-label">Повторение</label>
+    <select name="recurrence" class="tp-select">
+        <option value="">— Без повторения —</option>
+        <option value="daily"   <?= $recurrence === 'daily'   ? 'selected' : '' ?>>Ежедневно</option>
+        <option value="weekly"  <?= $recurrence === 'weekly'  ? 'selected' : '' ?>>Еженедельно</option>
+        <option value="monthly" <?= $recurrence === 'monthly' ? 'selected' : '' ?>>Ежемесячно</option>
+    </select>
+    <span style="font-size:10px;color:var(--text-dim);margin-top:3px;display:block;">При выполнении автоматически создаётся следующая задача</span>
+</div>
         </div><!-- /form-card-body -->
 
         <div class="form-card-footer">
@@ -390,6 +428,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 </div>
 <script>
+// Счётчик символов описания
+const descInput = document.getElementById('descInput');
+const descCount = document.getElementById('descCount');
+if (descInput && descCount) {
+    const update = () => { descCount.textContent = descInput.value.length + ' / 5000'; };
+    descInput.addEventListener('input', update);
+    update();
+}
+
 document.querySelector('form').addEventListener('submit', function(e) {
     const deadlineInput = document.querySelector('input[name="deadline"]');
     if (deadlineInput && deadlineInput.value) {

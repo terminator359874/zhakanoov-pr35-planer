@@ -502,6 +502,7 @@ $user_id = $_SESSION['user_id'];
     let viewDayDate = new Date(currentDate);
 
     let tasksCache = []; // flat list of current frame's tasks
+    const rangeCache = new Map(); // cache: 'start|end' => tasksByDay object
 
     let draggedTaskId = null;
 
@@ -555,7 +556,8 @@ $user_id = $_SESSION['user_id'];
             });
             const data = await res.json();
             if (data.success) {
-                loadData(); // Re-render silently
+                rangeCache.clear(); // сбрасываем кеш после изменения задачи
+                loadData(true); // Re-render silently
             } else {
                 alert('Ошибка: ' + data.error);
             }
@@ -636,7 +638,7 @@ $user_id = $_SESSION['user_id'];
         }
     }
 
-    async function loadData() {
+    async function loadData(forceReload = false) {
         updateNavButtons();
         
         let startDateStr = '';
@@ -657,10 +659,25 @@ $user_id = $_SESSION['user_id'];
             endDateStr = formatDateYMD(viewDayDate);
         }
 
+        const cacheKey = startDateStr + '|' + endDateStr;
+
+        // Используем кеш если данные уже загружены для этого диапазона
+        if (!forceReload && rangeCache.has(cacheKey)) {
+            const cached = rangeCache.get(cacheKey);
+            let flatTasks = [];
+            for (const date in cached) { flatTasks.push(...cached[date]); }
+            tasksCache = flatTasks;
+            if (viewMode === 'month') renderMonth(cached);
+            else if (viewMode === 'week') renderWeek(flatTasks);
+            else renderDay(flatTasks);
+            return;
+        }
+
         try {
             const res = await fetch(`get_tasks_by_range.php?start_date=${startDateStr}&end_date=${endDateStr}`);
             const data = await res.json();
             if (data.success) {
+                rangeCache.set(cacheKey, data.tasksByDay); // сохраняем в кеш
                 let flatTasks = [];
                 for (const date in data.tasksByDay) {
                     flatTasks.push(...data.tasksByDay[date]);

@@ -28,6 +28,13 @@ try {
 
     if (!$invite) throw new Exception('Приглашение не найдено или уже обработано.');
 
+    // Проверяем лимит участников (макс. 50)
+    $stmtCount = $db->prepare("SELECT COUNT(*) FROM project_members WHERE project_id = ?");
+    $stmtCount->execute([$invite['project_id']]);
+    if ((int)$stmtCount->fetchColumn() >= 50) {
+        throw new Exception('Достигнут лимит участников проекта (максимум 50). Принятие приглашения невозможно.');
+    }
+
     // Меняем статус на accepted
     $stmt = $db->prepare("UPDATE project_invitations SET status = 'accepted' WHERE id = ?");
     $stmt->execute([$invite_id]);

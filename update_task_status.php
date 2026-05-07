@@ -62,6 +62,27 @@ try {
         $details = "изменил(а) статус задачи «" . $taskData['title'] . "» на «" . $statusLabels[$status] . "»";
         logActivity($db, $taskData['project_id'], $user_id, $details, $task_id);
 
+        // Повторяющиеся задачи: создаём следующую при завершении
+        if ($status === 'done') {
+            $stmtRecur = $db->prepare("SELECT recurrence, title, description, priority, project_id, assigned_to FROM tasks WHERE id = ?");
+            $stmtRecur->execute([$task_id]);
+            $recurTask = $stmtRecur->fetch(PDO::FETCH_ASSOC);
+
+            if ($recurTask && !empty($recurTask['recurrence'])) {
+                $nextDeadline = null;
+                switch ($recurTask['recurrence']) {
+                    case 'daily':   $nextDeadline = date('Y-m-d H:i:s', strtotime('+1 day')); break;
+                    case 'weekly':  $nextDeadline = date('Y-m-d H:i:s', strtotime('+1 week')); break;
+                    case 'monthly': $nextDeadline = date('Y-m-d H:i:s', strtotime('+1 month')); break;
+                }
+                if ($nextDeadline) {
+                    $stmtNew = $db->prepare("INSERT INTO tasks (title, description, priority, deadline, project_id, assigned_to, status, recurrence) VALUES (?, ?, ?, ?, ?, ?, 'new', ?)");
+                    $stmtNew->execute([$recurTask['title'], $recurTask['description'], $recurTask['priority'], $nextDeadline, $recurTask['project_id'], $recurTask['assigned_to'], $recurTask['recurrence']]);
+                    logActivity($db, $recurTask['project_id'], $user_id, "создал(а) повторяющуюся задачу: " . $recurTask['title'], $db->lastInsertId());
+                }
+            }
+        }
+
         echo json_encode(['success' => true]);
     } else {
         echo json_encode(['success' => true, 'info' => 'No changes made']);
