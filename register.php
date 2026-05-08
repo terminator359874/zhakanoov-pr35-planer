@@ -9,31 +9,42 @@ $pdo = $database->getConnection();
 $userModel = new User($pdo);
 
 $message = '';
-$error = '';
+$errors = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $name = trim($_POST['name'] ?? '');
     $email    = trim($_POST['email'] ?? '');
-    $password = $_POST['password'] ?? '';
-    $confirm  = $_POST['confirm'] ?? '';
+    $password = trim($_POST['password'] ?? '');
+    $confirm  = trim($_POST['confirm'] ?? '');
 
-    if (empty($name) || empty($email) || empty($password) || empty($confirm)) {
-        $error = 'Заполните все поля!';
+    if (empty($name)) {
+        $errors[] = 'Имя пользователя обязательно для заполнения';
+    } elseif (mb_strlen($name) > 255) {
+        $errors[] = 'Имя пользователя не должно превышать 255 символов';
+    }
+
+    if (empty($email)) {
+        $errors[] = 'Email обязателен для заполнения';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error = 'Некорректный email!';
-    } elseif (mb_strlen($password) < 6) {
-        $error = 'Пароль должен быть не менее 6 символов!';
-    } elseif ($password !== $confirm) {
-        $error = 'Пароли не совпадают!';
+        $errors[] = 'Некорректный email!';
     } elseif ($userModel->emailExists($email)) {
-        $error = 'Пользователь с таким email уже зарегистрирован!';
-    } else {
+        $errors[] = 'Пользователь с таким email уже зарегистрирован!';
+    }
 
+    if (empty($password)) {
+        $errors[] = 'Пароль обязателен для заполнения';
+    } elseif (mb_strlen($password) < 6) {
+        $errors[] = 'Пароль должен быть не менее 6 символов!';
+    } elseif ($password !== $confirm) {
+        $errors[] = 'Пароли не совпадают!';
+    }
+
+    if (empty($errors)) {
         if ($userModel->register($name, $email, $password)) {
             $message = 'Регистрация успешна! Теперь вы можете войти.';
         } else {
-            $error = 'Ошибка при регистрации.';
+            $errors[] = 'Ошибка при регистрации.';
         }
     }
 }
@@ -64,9 +75,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
                     <?php endif; ?>
 
-                    <?php if ($error): ?>
-                        <div class="alert alert-danger">
-                            <?= htmlspecialchars($error) ?>
+                    <?php if (!empty($errors)): ?>
+                        <div class="alert alert-danger" style="color:red; border:1px solid red; padding:10px; margin-bottom: 10px;">
+                        <?php foreach ($errors as $e): ?>
+                            <p class="mb-0"><?= htmlspecialchars($e) ?></p>
+                        <?php endforeach; ?>
                         </div>
                     <?php endif; ?>
 
