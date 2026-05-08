@@ -9,7 +9,7 @@ $database = new Database();
 $pdo = $database->getConnection();
 
 $userModel = new User($pdo);
-$error = '';
+$errors = [];
 
 if (isset($_SESSION['user_id'])) {
     header('Location: index.php');
@@ -18,11 +18,16 @@ if (isset($_SESSION['user_id'])) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email    = trim($_POST['email'] ?? '');
-    $password = $_POST['password'] ?? '';
+    $password = trim($_POST['password'] ?? '');
 
-    if (empty($email) || empty($password)) {
-        $error = 'Заполните все поля!';
-    } else {
+    if (empty($email)) {
+        $errors[] = 'Поле Email обязательно для заполнения';
+    }
+    if (empty($password)) {
+        $errors[] = 'Поле Пароль обязательно для заполнения';
+    }
+
+    if (empty($errors)) {
         $user = $userModel->findByEmail($email);
 
         if ($user && password_verify($password, $user['password'])) {
@@ -33,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: index.php');
             exit;
         } else {
-            $error = 'Неверный email или пароль!';
+            $errors[] = 'Неверный email или пароль!';
         }
     }
 }
@@ -57,8 +62,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     <h2 class="text-center mb-4">Вход</h2>
 
-                    <?php if ($error): ?>
-                        <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
+                    <?php if (!empty($errors)): ?>
+                        <div class="alert alert-danger" style="color:red; border:1px solid red; padding:10px; margin-bottom: 10px;">
+                        <?php foreach ($errors as $e): ?>
+                            <p class="mb-0"><?= htmlspecialchars($e) ?></p>
+                        <?php endforeach; ?>
+                        </div>
                     <?php endif; ?>
 
                     <form method="POST">
